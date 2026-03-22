@@ -7,8 +7,8 @@ import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SendHorizontal, Paperclip } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SendHorizontal } from "lucide-react";
+import { FileUpload, UploadedFile } from "./FileUpload";
 
 function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -23,6 +23,7 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
     workspaceId: workspaceId ?? null,
   });
   const [input, setInput] = useState("");
+  const [files, setFiles] = useState<UploadedFile[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isLoading = status === 'streaming' || status === 'submitted';
@@ -32,9 +33,11 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && files.length === 0) || isLoading) return;
     const text = input;
+    // const attachedFiles = files.filter(f => f.status === 'done'); // Backend handles this
     setInput("");
+    setFiles([]);
     await sendMessage({ text });
   };
 
@@ -80,42 +83,40 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-zinc-950 dark:via-zinc-950/90 pt-10 pb-4 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative group">
-            <Tooltip>
-              <TooltipTrigger
-                className="absolute left-3 bottom-3 p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors rounded-md disabled:opacity-50"
-                disabled
+        <div className="max-w-4xl mx-auto flex flex-col gap-2">
+          
+          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
+            <div className="flex items-end w-full">
+              <FileUpload 
+                onFilesChange={setFiles} 
+                workspaceId={workspaceId ?? "default"} 
+                context={{ roleSlug: role.slug }}
+              />
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={`Ask ${role.name} for advice...`}
+                className="min-h-[56px] w-full resize-none border-0 bg-transparent py-4 pl-0 pr-14 text-base shadow-none focus-visible:ring-0 rounded-none focus-visible:ring-offset-0"
+                rows={1}
+              />
+              <Button
+                type="button"
+                size="icon"
+                className={`absolute right-2 bottom-2 h-10 w-10 rounded-xl transition-all ${
+                  input.trim() || files.length > 0
+                    ? `${role.bgDark} text-white hover:opacity-90`
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                }`}
+                onClick={handleSend}
+                disabled={(!input.trim() && files.length === 0) || isLoading}
               >
-                <Paperclip className="h-5 w-5" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>File upload coming soon</p>
-              </TooltipContent>
-            </Tooltip>
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={`Ask ${role.name} for advice...`}
-              className={`min-h-[56px] w-full resize-none rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 pl-12 pr-14 py-4 text-base shadow-sm focus-visible:ring-1 focus-visible:ring-zinc-400`}
-              rows={1}
-            />
-            <Button
-              type="button"
-              size="icon"
-              className={`absolute right-2 bottom-2 h-10 w-10 rounded-xl transition-all ${
-                input.trim()
-                  ? `${role.bgDark} text-white hover:opacity-90`
-                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-              }`}
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-            >
-              <SendHorizontal className="h-5 w-5" />
-              <span className="sr-only">Send Message</span>
-            </Button>
+                <SendHorizontal className="h-5 w-5" />
+                <span className="sr-only">Send Message</span>
+              </Button>
+            </div>
           </div>
+
           <div className="text-center mt-2">
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
               The {role.title} analyzes your input based on {role.description.toLowerCase()}.

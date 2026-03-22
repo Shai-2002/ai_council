@@ -93,3 +93,42 @@ export async function onLogout() {
   await supabase.auth.signOut();
   window.location.href = '/login';
 }
+
+// Wave 2 Placeholders
+
+export async function onUploadFiles(
+  files: File[],
+  workspaceId: string,
+  context: { projectId?: string; chatId?: string; roleSlug?: string }
+): Promise<Array<{ id: string; name: string; status: 'done' | 'failed' }>> {
+  console.log('[placeholder] upload files:', files.map(f => f.name), context);
+  await new Promise(r => setTimeout(r, 1500));
+  return files.map(f => ({ id: crypto.randomUUID(), name: f.name, status: 'done' as const }));
+}
+
+export async function onExportArtifact(id: string, format: 'markdown' | 'pdf') {
+  console.log('[placeholder] export artifact:', id, format);
+}
+
+export async function onCreateProject(name: string, description: string) {
+  console.log('[placeholder] create project:', name, description);
+  return { id: crypto.randomUUID(), name, description };
+}
+
+export async function onDeleteProject(id: string) {
+  console.log('[placeholder] delete project:', id);
+}
+
+export async function onCreateChat(params: { title: string; projectId?: string; roleSlug?: string }) {
+  console.log('[placeholder] create chat:', params);
+  return { id: crypto.randomUUID(), ...params };
+}
+
+export async function onDeleteChat(id: string) {
+  console.log('[placeholder] delete chat:', id);
+}
+
+export async function onMoveChat(chatId: string, targetProjectId: string | null) {
+  console.log('[placeholder] move chat:', chatId, 'to project:', targetProjectId);
+}
+

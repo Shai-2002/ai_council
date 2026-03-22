@@ -4,9 +4,9 @@ import { Dispatch, SetStateAction } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ROLES } from "@/lib/roles-config";
-import { onFinalizeArtifact } from "@/lib/placeholder";
+import { onFinalizeArtifact, onExportArtifact } from "@/lib/placeholder";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CheckCircle2, FileText } from "lucide-react";
+import { CheckCircle2, FileText, Download, Printer } from "lucide-react";
 import type { Artifact } from "@/types";
 
 export function ArtifactDetail({
@@ -53,13 +53,36 @@ export function ArtifactDetail({
               <FileText className="h-4 w-4" />
               {role.artifactType}
             </div>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-              artifact.status === "final"
-                ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
-                : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800"
-            }`}>
-              {artifact.status.charAt(0).toUpperCase() + artifact.status.slice(1)}
-            </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 mr-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-xs font-medium"
+                  onClick={() => onExportArtifact(artifactId, 'markdown')}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> MD
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-xs font-medium"
+                  onClick={() => {
+                    onExportArtifact(artifactId, 'pdf');
+                    window.print();
+                  }}
+                >
+                  <Printer className="h-3.5 w-3.5 mr-1.5" /> PDF
+                </Button>
+              </div>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                artifact.status === "final"
+                  ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                  : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800"
+              }`}>
+                {artifact.status.charAt(0).toUpperCase() + artifact.status.slice(1)}
+              </span>
+            </div>
           </div>
 
           <div>
