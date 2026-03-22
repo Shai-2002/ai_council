@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   // V6 transport sends: { trigger, chatId, messages, ...customBody }
-  const { messages: rawMessages, roleSlug, workspaceId } = body;
+  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId } = body;
 
   // Validate role
   const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       .join('') || '',
   }));
 
-  // Fetch workspace context
+  // ===== LAYER 2: Workspace context =====
   let companyContext = '';
   if (workspaceId) {
     const { data: workspace } = await supabase
@@ -69,10 +69,9 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fetch cross-role context: messages AND artifacts from OTHER roles
+  // ===== LAYER 3: Cross-role memory (messages + artifacts) =====
   let crossRoleContext = '';
   if (workspaceId) {
-    // Recent assistant messages from other roles
     const { data: crossRoleMessages } = await supabase
       .from('messages')
       .select('role_slug, sender, content, created_at')
@@ -89,7 +88,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Recent artifacts from other roles
     const { data: crossRoleArtifacts } = await supabase
       .from('artifacts')
       .select('role_slug, artifact_type, title, created_at')
@@ -106,8 +104,64 @@ export async function POST(req: Request) {
     }
   }
 
-  // Build full system prompt
-  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}`;
+  // ===== LAYER 4: Project cross-chat context =====
+  let projectContext = '';
+  const resolvedProjectId = projectId || null;
+  if (resolvedProjectId && chatId) {
+    const { data: projectChats } = await supabase
+      .from('messages')
+      .select('content, role_slug, chat_id, created_at, chats:chat_id(title)')
+      .eq('workspace_id', workspaceId)
+      .neq('chat_id', chatId)
+      .eq('sender', 'assistant')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (projectChats && projectChats.length > 0) {
+      projectContext = '\n\nCONTEXT FROM OTHER PROJECT CHATS:\n';
+      projectChats.forEach((m) => {
+        const chatTitle = (m.chats as unknown as { title: string })?.title || 'Unknown chat';
+        projectContext += `• Chat "${chatTitle}" (${(m.role_slug || 'unknown').toUpperCase()}): ${m.content.substring(0, 200)}...\n`;
+      });
+    }
+  }
+
+  // ===== LAYER 5: File context =====
+  let fileContext = '';
+  if (workspaceId) {
+    // Build file query: chat files > project files > role files
+    let fileQuery = supabase
+      .from('files')
+      .select('name, extracted_text, file_type')
+      .eq('workspace_id', workspaceId)
+      .eq('extraction_status', 'done')
+      .not('extracted_text', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (chatId) {
+      fileQuery = fileQuery.eq('chat_id', chatId);
+    } else if (resolvedProjectId) {
+      fileQuery = fileQuery.eq('project_id', resolvedProjectId);
+    } else if (roleSlug) {
+      fileQuery = fileQuery.eq('role_slug', roleSlug);
+    }
+
+    const { data: files } = await fileQuery;
+
+    if (files && files.length > 0) {
+      fileContext = '\n\nUPLOADED DOCUMENTS:\n';
+      files.forEach((f) => {
+        const text = f.extracted_text?.substring(0, 2000) || '';
+        if (text) {
+          fileContext += `• [${f.name}]: ${text}\n\n`;
+        }
+      });
+    }
+  }
+
+  // ===== ASSEMBLE SYSTEM PROMPT (6 layers) =====
+  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}`;
 
   // Stream the response
   const result = streamText({
@@ -117,7 +171,7 @@ export async function POST(req: Request) {
     onFinish: async ({ text }) => {
       if (!workspaceId) return;
 
-      // Save the user's last message and assistant response
+      // Save the user's last message and assistant response with chat_id
       const lastUserMessage = messages[messages.length - 1];
       if (lastUserMessage?.role === 'user') {
         await supabase.from('messages').insert({
@@ -125,6 +179,7 @@ export async function POST(req: Request) {
           role_slug: roleSlug,
           sender: 'user',
           content: lastUserMessage.content,
+          chat_id: chatId || null,
         });
       }
 
@@ -133,6 +188,7 @@ export async function POST(req: Request) {
         role_slug: roleSlug,
         sender: 'assistant',
         content: text,
+        chat_id: chatId || null,
       });
 
       // Try to detect and save artifact from JSON in response
@@ -158,6 +214,8 @@ export async function POST(req: Request) {
               title: typeof title === 'string' ? title.slice(0, 200) : String(title).slice(0, 200),
               structured_data: validation.data,
               status: 'draft',
+              chat_id: chatId || null,
+              project_id: resolvedProjectId,
             });
           }
         } catch {
