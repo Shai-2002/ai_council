@@ -13,11 +13,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await onLogin(email);
-    // Loading state will be handled by navigation in placeholder
+    setError("");
+    try {
+      await onLogin(email, password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+      setLoading(false);
+    }
   };
 
   return (
@@ -30,6 +37,11 @@ export default function LoginPage() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input 
