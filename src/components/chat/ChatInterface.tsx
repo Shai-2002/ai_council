@@ -1,20 +1,29 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import { Role, Message as AppMessage } from "@/types";
+import { useState, useRef, useEffect } from "react";
+import { Role } from "@/types";
 import { useRoleChat } from "@/lib/hooks/useRoleChat";
+import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SendHorizontal } from "lucide-react";
 
-export function ChatInterface({ role, workspaceId, initialMessages = [] }: { role: Role; workspaceId?: string | null; initialMessages?: AppMessage[] }) {
-  const { messages, input, setInput, handleSubmit, isLoading } = useRoleChat({
-    roleSlug: role.slug,
+function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
+  return msg.parts
+    ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('') || '';
+}
+
+export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?: string | null }) {
+  const { messages, sendMessage, status } = useRoleChat({
+    roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,
-    initialMessages,
   });
+  const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isLoading = status === 'streaming' || status === 'submitted';
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -22,12 +31,26 @@ export function ChatInterface({ role, workspaceId, initialMessages = [] }: { rol
     }
   }, [messages]);
 
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    const text = input;
+    setInput("");
+    await sendMessage({ text });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+      handleSend();
     }
   };
+
+  // Convert UIMessage to our Message format for MessageBubble
+  const displayMessages = messages.map((msg) => ({
+    id: msg.id,
+    role: msg.role as 'user' | 'assistant',
+    content: getMessageContent(msg),
+  }));
 
   return (
     <div className="flex flex-col h-full relative">
@@ -36,12 +59,12 @@ export function ChatInterface({ role, workspaceId, initialMessages = [] }: { rol
         className="flex-1 overflow-y-auto p-4 sm:p-6 pb-32"
       >
         <div className="max-w-4xl mx-auto">
-          {messages.map((msg) => (
+          {displayMessages.map((msg) => (
             <div key={msg.id}>
               <MessageBubble message={msg} role={role} />
             </div>
           ))}
-          {isLoading && (
+          {isLoading && displayMessages[displayMessages.length - 1]?.role !== 'assistant' && (
             <div className={`flex w-full mb-6 justify-start`}>
                <div className="flex max-w-[75%] gap-4">
                  <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 animate-pulse mt-1" />
@@ -57,7 +80,7 @@ export function ChatInterface({ role, workspaceId, initialMessages = [] }: { rol
 
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-zinc-950 dark:via-zinc-950/90 pt-10 pb-4 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
-          <form onSubmit={handleSubmit} className="relative group">
+          <div className="relative group">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -67,19 +90,20 @@ export function ChatInterface({ role, workspaceId, initialMessages = [] }: { rol
               rows={1}
             />
             <Button
-              type="submit"
+              type="button"
               size="icon"
               className={`absolute right-2 bottom-2 h-10 w-10 rounded-xl transition-all ${
                 input.trim()
                   ? `${role.bgDark} text-white hover:opacity-90`
                   : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
               }`}
+              onClick={handleSend}
               disabled={!input.trim() || isLoading}
             >
               <SendHorizontal className="h-5 w-5" />
               <span className="sr-only">Send Message</span>
             </Button>
-          </form>
+          </div>
           <div className="text-center mt-2">
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
               The {role.title} analyzes your input based on {role.description.toLowerCase()}.

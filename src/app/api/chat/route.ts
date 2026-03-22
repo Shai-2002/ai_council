@@ -1,4 +1,4 @@
-import { streamText } from 'ai';
+import { streamText, type UIMessage } from 'ai';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { roleModel } from '@/lib/ai/provider';
@@ -6,7 +6,10 @@ import { ROLE_CONFIGS } from '@/lib/ai/roles';
 import type { RoleSlug } from '@/types';
 
 export async function POST(req: Request) {
-  const { messages, roleSlug, workspaceId } = await req.json();
+  const body = await req.json();
+
+  // V6 transport sends: { trigger, chatId, messages, ...customBody }
+  const { messages: rawMessages, roleSlug, workspaceId } = body;
 
   // Validate role
   const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
@@ -43,6 +46,15 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Convert UIMessage[] to the format streamText expects
+  const messages = (rawMessages as UIMessage[]).map((msg) => ({
+    role: msg.role as 'user' | 'assistant' | 'system',
+    content: msg.parts
+      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+      .map((p) => p.text)
+      .join('') || '',
+  }));
+
   // Fetch workspace context
   let companyContext = '';
   if (workspaceId) {
@@ -62,7 +74,7 @@ export async function POST(req: Request) {
   if (workspaceId) {
     const { data: artifacts } = await supabase
       .from('artifacts')
-      .select('role_slug, artifact_type, title, structured_data, created_at')
+      .select('role_slug, artifact_type, title, created_at')
       .eq('workspace_id', workspaceId)
       .neq('role_slug', roleSlug)
       .order('created_at', { ascending: false })
@@ -113,7 +125,6 @@ export async function POST(req: Request) {
           const validation = roleConfig.outputSchema.safeParse(parsed);
 
           if (validation.success) {
-            // Generate a title from the artifact
             const title =
               parsed.decision ||
               parsed.objective ||
@@ -138,5 +149,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }

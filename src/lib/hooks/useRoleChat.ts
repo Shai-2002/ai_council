@@ -1,41 +1,25 @@
 'use client';
 
-import { useChat } from 'ai/react';
-import type { Message as AppMessage } from '@/types';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import type { RoleSlug } from '@/types';
 
 export function useRoleChat({
   roleSlug,
   workspaceId,
-  initialMessages = [],
 }: {
   roleSlug: RoleSlug;
   workspaceId: string | null;
-  initialMessages?: AppMessage[];
 }) {
-  const { messages, input, setInput, handleSubmit, isLoading, append } = useChat({
-    api: '/api/chat',
-    body: {
-      roleSlug,
-      workspaceId,
-    },
-    initialMessages: initialMessages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-    })),
+  const chatHelpers = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        roleSlug,
+        workspaceId,
+      },
+    }),
   });
 
-  return {
-    messages: messages.map((m) => ({
-      id: m.id,
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
-    input,
-    setInput,
-    handleSubmit,
-    isLoading,
-    append,
-  };
+  return chatHelpers;
 }
