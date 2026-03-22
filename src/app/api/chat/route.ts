@@ -69,10 +69,28 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fetch cross-role artifacts (5 most recent from OTHER roles)
+  // Fetch cross-role context: messages AND artifacts from OTHER roles
   let crossRoleContext = '';
   if (workspaceId) {
-    const { data: artifacts } = await supabase
+    // Recent assistant messages from other roles
+    const { data: crossRoleMessages } = await supabase
+      .from('messages')
+      .select('role_slug, sender, content, created_at')
+      .eq('workspace_id', workspaceId)
+      .neq('role_slug', roleSlug)
+      .eq('sender', 'assistant')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (crossRoleMessages && crossRoleMessages.length > 0) {
+      crossRoleContext += '\n\nRECENT CONVERSATIONS WITH OTHER ROLES:\n';
+      crossRoleMessages.forEach((m) => {
+        crossRoleContext += `• ${m.role_slug.toUpperCase()} said: ${m.content.substring(0, 200)}...\n`;
+      });
+    }
+
+    // Recent artifacts from other roles
+    const { data: crossRoleArtifacts } = await supabase
       .from('artifacts')
       .select('role_slug, artifact_type, title, created_at')
       .eq('workspace_id', workspaceId)
@@ -80,11 +98,11 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    if (artifacts && artifacts.length > 0) {
-      const summaries = artifacts.map(
-        (a) => `[${a.role_slug.toUpperCase()} - ${a.artifact_type}] "${a.title}" (${new Date(a.created_at).toLocaleDateString()})`
-      );
-      crossRoleContext = `\n\nRECENT ARTIFACTS FROM OTHER ROLES (use these for cross-role awareness):\n${summaries.join('\n')}`;
+    if (crossRoleArtifacts && crossRoleArtifacts.length > 0) {
+      crossRoleContext += '\n\nRECENT ARTIFACTS FROM OTHER ROLES:\n';
+      crossRoleArtifacts.forEach((a) => {
+        crossRoleContext += `• ${a.role_slug.toUpperCase()} created ${a.artifact_type}: "${a.title}"\n`;
+      });
     }
   }
 
