@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Role } from "@/types";
 import { useRoleChat } from "@/lib/hooks/useRoleChat";
 import type { RoleSlug } from "@/types";
@@ -26,12 +26,25 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [resetSignal, setResetSignal] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUp = useRef(false);
   const isLoading = status === 'streaming' || status === 'submitted';
 
+  // Track if user has manually scrolled up
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    isUserScrolledUp.current = scrollHeight - scrollTop - clientHeight > 100;
+  }, []);
+
+  // Auto-scroll only if user hasn't scrolled up — use 'instant' to avoid jitter
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isUserScrolledUp.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    }
   }, [messages]);
 
   const handleSend = async () => {
@@ -39,6 +52,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     const text = input;
     setInput("");
     setFiles([]);
+    setResetSignal(prev => prev + 1); // Bug 1: clear file chips in FileUpload
     await sendMessage({ text });
   };
 
@@ -58,8 +72,9 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
   return (
     <div className="flex flex-col h-full relative">
       <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 sm:p-6 pb-32"
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pb-32"
       >
         <div className="max-w-4xl mx-auto">
           {displayMessages.map((msg) => (
@@ -67,18 +82,25 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
               <MessageBubble message={msg} role={role} />
             </div>
           ))}
+          {/* Bug 6: Clean typing indicator */}
           {isLoading && displayMessages[displayMessages.length - 1]?.role !== 'assistant' && (
-            <div className={`flex w-full mb-6 justify-start`}>
-               <div className="flex max-w-[75%] gap-4">
-                 <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 animate-pulse mt-1" />
-                 <div className="flex flex-col gap-2">
-                    <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-                    <div className="h-24 w-48 bg-zinc-100 dark:bg-zinc-900 rounded-2xl rounded-tl-sm border border-zinc-200 dark:border-zinc-800 animate-pulse" />
-                 </div>
-               </div>
+            <div className="flex w-full mb-6 justify-start">
+              <div className="flex max-w-[75%] gap-4">
+                <div className={`h-8 w-8 rounded-full ${role.bgDark} text-white flex items-center justify-center text-xs font-medium mt-1 shrink-0`}>
+                  {role.name[0]}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{role.name}</span>
+                  <div className="flex items-center gap-1.5 py-3 px-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl rounded-tl-sm shadow-sm">
+                    <div className="h-2 w-2 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="h-2 w-2 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="h-2 w-2 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
-          <div ref={bottomRef} />
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
@@ -91,6 +113,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
                 onFilesChange={setFiles}
                 workspaceId={workspaceId ?? "default"}
                 context={{ roleSlug: role.slug, chatId, projectId }}
+                resetSignal={resetSignal}
               />
               <Textarea
                 value={input}

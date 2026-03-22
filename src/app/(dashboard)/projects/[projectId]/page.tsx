@@ -4,12 +4,20 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { ROLES } from "@/lib/roles-config";
-import { Folder, ChevronRight, MessageSquare, Plus, FileText, Settings } from "lucide-react";
+import { Folder, ChevronRight, MessageSquare, Plus, FileText, Settings, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilePool } from "@/components/files/FilePool";
 import { onCreateChat } from "@/lib/placeholder";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 interface ProjectData {
   id: string;
@@ -26,6 +34,8 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chats");
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
     if (!projectId) return;
@@ -79,10 +89,70 @@ export default function ProjectDetail() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="shrink-0 bg-transparent">
-              <Settings className="h-4 w-4 mr-2" /> Manage
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium border border-zinc-200 dark:border-zinc-800 bg-transparent px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0">
+                <Settings className="h-4 w-4" /> Manage
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setNewName(project.name); setIsRenaming(true); }}>
+                  <Pencil className="h-4 w-4 mr-2" /> Rename project
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                  onClick={async () => {
+                    if (confirm('Delete this project and all its chats?')) {
+                      await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+                      router.push('/projects');
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          {/* Rename dialog inline */}
+          {isRenaming && (
+            <div className="flex items-center gap-2 mt-4 w-full">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="flex-1"
+                autoFocus
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && newName.trim()) {
+                    await fetch(`/api/projects/${projectId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: newName.trim() }),
+                    });
+                    setProject(prev => prev ? { ...prev, name: newName.trim() } : prev);
+                    setIsRenaming(false);
+                  }
+                  if (e.key === 'Escape') setIsRenaming(false);
+                }}
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (newName.trim()) {
+                    await fetch(`/api/projects/${projectId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: newName.trim() }),
+                    });
+                    setProject(prev => prev ? { ...prev, name: newName.trim() } : prev);
+                    setIsRenaming(false);
+                  }
+                }}
+              >
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsRenaming(false)}>Cancel</Button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}

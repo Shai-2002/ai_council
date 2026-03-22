@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { FileText, FileCode, Table, Image as ImageIcon, FileJson, Download, Trash2, UploadCloud, CheckCircle2, Clock } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { FileText, FileCode, Table, Image as ImageIcon, FileJson, Download, Trash2, UploadCloud, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
+import { onUploadFiles } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 
 interface FileItem {
@@ -19,23 +20,26 @@ export function FilePool({ context }: { context: { projectId?: string; roleSlug?
   const { workspaceId } = useWorkspace();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const loadFiles = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
 
-    async function load() {
-      const params = new URLSearchParams({ workspaceId: workspaceId! });
-      if (context.projectId) params.set('projectId', context.projectId);
-      if (context.roleSlug) params.set('roleSlug', context.roleSlug);
+    const params = new URLSearchParams({ workspaceId: workspaceId! });
+    if (context.projectId) params.set('projectId', context.projectId);
+    if (context.roleSlug) params.set('roleSlug', context.roleSlug);
 
-      try {
-        const res = await fetch(`/api/files?${params}`);
-        if (res.ok) setFiles(await res.json());
-      } catch { /* ignore */ }
-      setLoading(false);
-    }
-    load();
+    try {
+      const res = await fetch(`/api/files?${params}`);
+      if (res.ok) setFiles(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
   }, [workspaceId, context.projectId, context.roleSlug]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -57,6 +61,31 @@ export function FilePool({ context }: { context: { projectId?: string; roleSlug?
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleFiles = async (selectedFiles: File[]) => {
+    if (!workspaceId || selectedFiles.length === 0) return;
+    setUploading(true);
+    try {
+      await onUploadFiles(selectedFiles, workspaceId, context);
+      await loadFiles();
+    } catch { /* ignore */ }
+    setUploading(false);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      handleFiles(Array.from(e.target.files));
+      e.target.value = "";
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files?.length) {
+      handleFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const handleDownload = async (file: FileItem) => {
@@ -82,13 +111,32 @@ export function FilePool({ context }: { context: { projectId?: string; roleSlug?
 
   return (
     <div className="space-y-6">
-      {/* Drag & Drop Zone */}
-      <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-zinc-50/50 dark:bg-zinc-900/20 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.docx,.md,.txt,.csv,.png,.jpg,.jpeg,.json"
+        className="hidden"
+        onChange={handleFileInput}
+      />
+
+      {/* Drag & Drop Zone — now clickable */}
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDrop={handleDrop}
+        className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-zinc-50/50 dark:bg-zinc-900/20 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group"
+      >
         <div className="p-3 bg-white dark:bg-zinc-800 rounded-full shadow-sm mb-4 border border-zinc-100 dark:border-zinc-700 group-hover:scale-105 transition-transform">
-          <UploadCloud className="h-6 w-6 text-indigo-500" />
+          {uploading ? (
+            <Loader2 className="h-6 w-6 text-indigo-500 animate-spin" />
+          ) : (
+            <UploadCloud className="h-6 w-6 text-indigo-500" />
+          )}
         </div>
         <p className="font-medium text-zinc-900 dark:text-zinc-100 mb-1">
-          Drop files here or click to upload
+          {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Supports PDF, DOCX, MD, TXT, CSV up to 50MB

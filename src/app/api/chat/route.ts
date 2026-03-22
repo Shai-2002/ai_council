@@ -79,12 +79,12 @@ export async function POST(req: Request) {
       .neq('role_slug', roleSlug)
       .eq('sender', 'assistant')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(6);
 
     if (crossRoleMessages && crossRoleMessages.length > 0) {
       crossRoleContext += '\n\nRECENT CONVERSATIONS WITH OTHER ROLES:\n';
       crossRoleMessages.forEach((m) => {
-        crossRoleContext += `• ${m.role_slug.toUpperCase()} said: ${m.content.substring(0, 200)}...\n`;
+        crossRoleContext += `• ${m.role_slug.toUpperCase()} said: ${m.content.substring(0, 150)}...\n`;
       });
     }
 
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       .eq('workspace_id', workspaceId)
       .neq('role_slug', roleSlug)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(3);
 
     if (crossRoleArtifacts && crossRoleArtifacts.length > 0) {
       crossRoleContext += '\n\nRECENT ARTIFACTS FROM OTHER ROLES:\n';
@@ -115,13 +115,13 @@ export async function POST(req: Request) {
       .neq('chat_id', chatId)
       .eq('sender', 'assistant')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(3);
 
     if (projectChats && projectChats.length > 0) {
       projectContext = '\n\nCONTEXT FROM OTHER PROJECT CHATS:\n';
       projectChats.forEach((m) => {
         const chatTitle = (m.chats as unknown as { title: string })?.title || 'Unknown chat';
-        projectContext += `• Chat "${chatTitle}" (${(m.role_slug || 'unknown').toUpperCase()}): ${m.content.substring(0, 200)}...\n`;
+        projectContext += `• Chat "${chatTitle}" (${(m.role_slug || 'unknown').toUpperCase()}): ${m.content.substring(0, 150)}...\n`;
       });
     }
   }
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
       .eq('extraction_status', 'done')
       .not('extracted_text', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(3);
 
     if (chatId) {
       fileQuery = fileQuery.eq('chat_id', chatId);
@@ -152,7 +152,7 @@ export async function POST(req: Request) {
     if (files && files.length > 0) {
       fileContext = '\n\nUPLOADED DOCUMENTS:\n';
       files.forEach((f) => {
-        const text = f.extracted_text?.substring(0, 2000) || '';
+        const text = f.extracted_text?.substring(0, 1500) || '';
         if (text) {
           fileContext += `• [${f.name}]: ${text}\n\n`;
         }
