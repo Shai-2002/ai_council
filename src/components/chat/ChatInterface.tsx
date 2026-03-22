@@ -6,7 +6,6 @@ import { useRoleChat } from "@/lib/hooks/useRoleChat";
 import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { SendHorizontal } from "lucide-react";
 import { FileUpload, UploadedFile } from "./FileUpload";
 
@@ -38,11 +37,21 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
   }, []);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    if (shouldAutoScroll.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    if (shouldAutoScroll.current && messagesEndRef.current) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      });
     }
   }, [messages]);
+
+  // Also scroll on initial mount
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    });
+  }, []);
 
   const handleSend = async () => {
     if ((!input.trim() && files.length === 0) || isLoading) return;
@@ -110,8 +119,8 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
+        <div ref={messagesEndRef} className="h-px" />
       </div>
 
       {/* Input bar — pinned to bottom, never scrolls */}
@@ -119,18 +128,20 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
         <div className="max-w-4xl mx-auto">
           <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
             <div className="flex items-end w-full">
-              <FileUpload
-                onFilesChange={setFiles}
-                workspaceId={workspaceId ?? "default"}
-                context={{ roleSlug: role.slug, chatId, projectId }}
-                resetSignal={resetSignal}
-              />
-              <Textarea
+              <div className="shrink-0 self-end">
+                <FileUpload
+                  onFilesChange={setFiles}
+                  workspaceId={workspaceId ?? "default"}
+                  context={{ roleSlug: role.slug, chatId, projectId }}
+                  resetSignal={resetSignal}
+                />
+              </div>
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Ask ${role.name} for advice...`}
-                className="min-h-[48px] max-h-[120px] w-full resize-none border-0 bg-transparent py-3 pl-0 pr-14 text-base shadow-none focus-visible:ring-0 rounded-none focus-visible:ring-offset-0"
+                className="block min-h-[48px] max-h-[120px] flex-1 resize-none border-0 bg-transparent py-3 pl-1 pr-14 text-left text-base leading-normal placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                 rows={1}
               />
               <Button
