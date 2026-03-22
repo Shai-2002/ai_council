@@ -29,20 +29,17 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
   const [resetSignal, setResetSignal] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isUserScrolledUp = useRef(false);
+  const shouldAutoScroll = useRef(true);
   const isLoading = status === 'streaming' || status === 'submitted';
 
-  // Track if user has manually scrolled up
   const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    isUserScrolledUp.current = scrollHeight - scrollTop - clientHeight > 100;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
   }, []);
 
-  // Auto-scroll only if user hasn't scrolled up — use 'instant' to avoid jitter
   useEffect(() => {
-    if (!isUserScrolledUp.current) {
+    if (shouldAutoScroll.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
     }
   }, [messages]);
@@ -52,7 +49,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     const text = input;
     setInput("");
     setFiles([]);
-    setResetSignal(prev => prev + 1); // Bug 1: clear file chips in FileUpload
+    setResetSignal(prev => prev + 1);
     await sendMessage({ text });
   };
 
@@ -70,19 +67,32 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
   }));
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full">
+      {/* Messages — scrollable, fills all remaining space */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pb-32"
+        className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6"
       >
         <div className="max-w-4xl mx-auto">
+          {displayMessages.length === 0 && !isLoading && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className={`p-4 rounded-2xl ${role.bgLight} mb-4`}>
+                <span className={`text-2xl font-bold ${role.text}`}>{role.name[0]}</span>
+              </div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                Chat with {role.name}
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md">
+                {role.description}. Ask anything to get started.
+              </p>
+            </div>
+          )}
           {displayMessages.map((msg) => (
             <div key={msg.id}>
               <MessageBubble message={msg} role={role} />
             </div>
           ))}
-          {/* Bug 6: Clean typing indicator */}
           {isLoading && displayMessages[displayMessages.length - 1]?.role !== 'assistant' && (
             <div className="flex w-full mb-6 justify-start">
               <div className="flex max-w-[75%] gap-4">
@@ -104,10 +114,10 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-zinc-950 dark:via-zinc-950/90 pt-10 pb-4 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto flex flex-col gap-2">
-
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
+      {/* Input bar — pinned to bottom, never scrolls */}
+      <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 sm:px-6 py-3">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
             <div className="flex items-end w-full">
               <FileUpload
                 onFilesChange={setFiles}
@@ -120,26 +130,25 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Ask ${role.name} for advice...`}
-                className="min-h-[56px] w-full resize-none border-0 bg-transparent py-4 pl-0 pr-14 text-base shadow-none focus-visible:ring-0 rounded-none focus-visible:ring-offset-0"
+                className="min-h-[48px] max-h-[120px] w-full resize-none border-0 bg-transparent py-3 pl-0 pr-14 text-base shadow-none focus-visible:ring-0 rounded-none focus-visible:ring-offset-0"
                 rows={1}
               />
               <Button
                 type="button"
                 size="icon"
-                className={`absolute right-2 bottom-2 h-10 w-10 rounded-xl transition-all ${
+                className={`absolute right-2 bottom-2 h-9 w-9 rounded-xl transition-all ${
                   input.trim() || files.length > 0
                     ? `${role.bgDark} text-white hover:opacity-90`
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-300 dark:hover:bg-zinc-700"
                 }`}
                 onClick={handleSend}
                 disabled={(!input.trim() && files.length === 0) || isLoading}
               >
-                <SendHorizontal className="h-5 w-5" />
+                <SendHorizontal className="h-4 w-4" />
                 <span className="sr-only">Send Message</span>
               </Button>
             </div>
           </div>
-
           <div className="text-center mt-2">
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
               The {role.title} analyzes your input based on {role.description.toLowerCase()}.

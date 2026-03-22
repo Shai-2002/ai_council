@@ -22,7 +22,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Mobile Header & Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
           <div className="flex items-center gap-2 font-semibold text-lg text-zinc-900 dark:text-zinc-100">
@@ -42,7 +42,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Dynamic Page Content */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
       </main>
