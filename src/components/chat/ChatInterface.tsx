@@ -7,7 +7,8 @@ import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SendHorizontal } from "lucide-react";
+import { SendHorizontal, Paperclip } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -81,12 +82,23 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-zinc-950 dark:via-zinc-950/90 pt-10 pb-4 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <div className="relative group">
+            <Tooltip>
+              <TooltipTrigger
+                className="absolute left-3 bottom-3 p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors rounded-md disabled:opacity-50"
+                disabled
+              >
+                <Paperclip className="h-5 w-5" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>File upload coming soon</p>
+              </TooltipContent>
+            </Tooltip>
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Ask ${role.name} for advice...`}
-              className={`min-h-[56px] w-full resize-none rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 pr-14 py-4 text-base shadow-sm focus-visible:ring-1 focus-visible:ring-zinc-400`}
+              className={`min-h-[56px] w-full resize-none rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 pl-12 pr-14 py-4 text-base shadow-sm focus-visible:ring-1 focus-visible:ring-zinc-400`}
               rows={1}
             />
             <Button
