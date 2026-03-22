@@ -24,7 +24,7 @@ export function FilePool({ context }: { context: { projectId?: string; roleSlug?
     if (!workspaceId) { setLoading(false); return; }
 
     async function load() {
-      const params = new URLSearchParams({ workspaceId });
+      const params = new URLSearchParams({ workspaceId: workspaceId! });
       if (context.projectId) params.set('projectId', context.projectId);
       if (context.roleSlug) params.set('roleSlug', context.roleSlug);
 

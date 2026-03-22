@@ -22,7 +22,7 @@ interface ProjectData {
 export default function ProjectDetail() {
   const { projectId } = useParams();
   const router = useRouter();
-  const { workspaceId } = useWorkspace();
+  useWorkspace(); // ensure context is available
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chats");
