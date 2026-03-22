@@ -14,17 +14,24 @@ export async function onLogin(email: string, password: string) {
 
 export async function onSignup(name: string, email: string, password: string) {
   const supabase = createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { full_name: name },
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
   if (error) {
     throw new Error(error.message);
   }
-  window.location.href = '/ceo';
+  // If email confirmation is disabled, user has a session immediately
+  if (data.session) {
+    window.location.href = '/ceo';
+  } else {
+    // Email confirmation is enabled — user needs to check email
+    throw new Error('Check your email for a confirmation link, then log in.');
+  }
 }
 
 export async function onSelectRole(slug: string) {
