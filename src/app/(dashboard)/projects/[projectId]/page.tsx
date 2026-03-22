@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MOCK_PROJECTS } from "@/lib/mock-sidebar-data";
+import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { ROLES } from "@/lib/roles-config";
 import { Folder, ChevronRight, MessageSquare, Plus, FileText, Settings } from "lucide-react";
 import Link from "next/link";
@@ -11,23 +11,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilePool } from "@/components/files/FilePool";
 import { onCreateChat } from "@/lib/placeholder";
 
+interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  chats: Array<{ id: string; title: string; role_slug: string; updated_at: string }>;
+  files: Array<{ id: string; name: string }>;
+}
+
 export default function ProjectDetail() {
   const { projectId } = useParams();
   const router = useRouter();
-  const project = MOCK_PROJECTS.find(p => p.id === projectId);
-  
+  const { workspaceId } = useWorkspace();
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chats");
 
+  useEffect(() => {
+    if (!projectId) return;
+    async function load() {
+      try {
+        const res = await fetch(`/api/projects/${projectId}`);
+        if (res.ok) setProject(await res.json());
+      } catch { /* ignore */ }
+      setLoading(false);
+    }
+    load();
+  }, [projectId]);
+
+  if (loading) {
+    return <div className="flex-1 flex items-center justify-center h-full text-zinc-400">Loading project...</div>;
+  }
+
   if (!project) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center h-full text-zinc-500">
-        Project not found.
-      </div>
-    );
+    return <div className="flex-1 flex flex-col items-center justify-center h-full text-zinc-500">Project not found.</div>;
   }
 
   const handleCreateChat = async () => {
-    // For demo, default to CEO when creating from project root
     const chat = await onCreateChat({ title: "New Project Chat", projectId: project.id, roleSlug: "ceo" });
     router.push(`/projects/${project.id}/chat/${chat.id}`);
   };
@@ -35,7 +55,7 @@ export default function ProjectDetail() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-50 dark:bg-zinc-950 overflow-y-auto">
       <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-6">
-        
+
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-500 mb-6">
           <Link href="/projects" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Projects</Link>
@@ -65,7 +85,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        {/* Workspace Tabs */}
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
           <TabsList className="bg-zinc-200/50 dark:bg-zinc-900 p-1 rounded-xl h-12 w-full sm:w-auto inline-flex mb-6">
             <TabsTrigger value="chats" className="rounded-lg px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm text-sm">
@@ -75,7 +95,7 @@ export default function ProjectDetail() {
               <FileText className="h-4 w-4 mr-2" /> Files
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="chats" className="outline-none">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold dark:text-zinc-100">Active Discussions</h3>
@@ -83,17 +103,17 @@ export default function ProjectDetail() {
                 <Plus className="h-4 w-4 mr-1.5" /> New Chat
               </Button>
             </div>
-            
+
             <div className="grid gap-3">
-              {project.chats.length > 0 ? project.chats.map(chat => {
-                const role = ROLES[chat.roleSlug];
+              {project.chats && project.chats.length > 0 ? project.chats.map(chat => {
+                const role = ROLES[chat.role_slug];
                 return (
-                  <Link 
-                    key={chat.id} 
+                  <Link
+                    key={chat.id}
                     href={`/projects/${project.id}/chat/${chat.id}`}
                     className="flex items-center gap-4 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors group"
                   >
-                    <div className={`p-2.5 rounded-lg ${role?.bgDark} text-white shrink-0`}>
+                    <div className={`p-2.5 rounded-lg ${role?.bgDark || 'bg-zinc-500'} text-white shrink-0`}>
                       <MessageSquare className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -101,10 +121,10 @@ export default function ProjectDetail() {
                         {chat.title}
                       </h4>
                       <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
-                        With {role?.name || chat.roleSlug} • Last active recent
+                        With {role?.name || chat.role_slug}
                       </p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
+                    <ChevronRight className="h-5 w-5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </Link>
                 );
               }) : (
@@ -114,7 +134,7 @@ export default function ProjectDetail() {
               )}
             </div>
           </TabsContent>
-          
+
           <TabsContent value="files" className="outline-none">
             <div className="mb-4">
               <h3 className="text-lg font-semibold dark:text-zinc-100">Project Knowledge Base</h3>
@@ -123,7 +143,6 @@ export default function ProjectDetail() {
             <FilePool context={{ projectId: project.id }} />
           </TabsContent>
         </Tabs>
-
       </div>
     </div>
   );

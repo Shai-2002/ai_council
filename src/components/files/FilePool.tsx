@@ -1,19 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, FileCode, Table, Image as ImageIcon, FileJson, Download, Trash2, UploadCloud, CheckCircle2, Clock } from "lucide-react";
-import { MOCK_FILES } from "@/lib/mock-sidebar-data";
+import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { Button } from "@/components/ui/button";
 
-export function FilePool({ context: _context }: { context: { projectId?: string; roleSlug?: string } }) {
-  const [files, setFiles] = useState(MOCK_FILES);
+interface FileItem {
+  id: string;
+  name: string;
+  file_type: string;
+  size_bytes: number;
+  extraction_status: string;
+  created_at: string;
+  download_url?: string;
+}
+
+export function FilePool({ context }: { context: { projectId?: string; roleSlug?: string } }) {
+  const { workspaceId } = useWorkspace();
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!workspaceId) { setLoading(false); return; }
+
+    async function load() {
+      const params = new URLSearchParams({ workspaceId });
+      if (context.projectId) params.set('projectId', context.projectId);
+      if (context.roleSlug) params.set('roleSlug', context.roleSlug);
+
+      try {
+        const res = await fetch(`/api/files?${params}`);
+        if (res.ok) setFiles(await res.json());
+      } catch { /* ignore */ }
+      setLoading(false);
+    }
+    load();
+  }, [workspaceId, context.projectId, context.roleSlug]);
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
     switch (ext) {
       case 'pdf': return <FileText className="h-6 w-6 text-red-500 shrink-0" />;
       case 'docx': return <FileText className="h-6 w-6 text-blue-500 shrink-0" />;
-      case 'md': 
+      case 'md':
       case 'txt': return <FileCode className="h-6 w-6 text-zinc-500 shrink-0" />;
       case 'csv': return <Table className="h-6 w-6 text-emerald-500 shrink-0" />;
       case 'png':
@@ -30,9 +59,26 @@ export function FilePool({ context: _context }: { context: { projectId?: string;
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const handleDelete = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
+  const handleDownload = async (file: FileItem) => {
+    try {
+      const res = await fetch(`/api/files/${file.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.download_url) window.open(data.download_url, '_blank');
+      }
+    } catch { /* ignore */ }
   };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/files/${id}`, { method: 'DELETE' });
+      if (res.ok) setFiles(prev => prev.filter(f => f.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-12 text-zinc-400">Loading files...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -70,21 +116,21 @@ export function FilePool({ context: _context }: { context: { projectId?: string;
                   </div>
                 )}
               </div>
-              
+
               <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate mb-1" title={file.name}>
                 {file.name}
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
                 {formatSize(file.size_bytes)} • {new Date(file.created_at).toLocaleDateString()}
               </p>
-              
+
               <div className="mt-auto flex items-center gap-2 pt-4 border-t border-zinc-100 dark:border-zinc-900">
-                <Button variant="outline" size="sm" className="flex-1 h-8 text-xs bg-transparent">
+                <Button variant="outline" size="sm" className="flex-1 h-8 text-xs bg-transparent" onClick={() => handleDownload(file)}>
                   <Download className="h-3 w-3 mr-1.5" /> Download
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
                   onClick={() => handleDelete(file.id)}
                 >

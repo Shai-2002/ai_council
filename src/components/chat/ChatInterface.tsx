@@ -17,10 +17,12 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
     .join('') || '';
 }
 
-export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?: string | null }) {
+export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string }) {
   const { messages, sendMessage, status } = useRoleChat({
     roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,
+    chatId: chatId ?? null,
+    projectId: projectId ?? null,
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -35,7 +37,6 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
   const handleSend = async () => {
     if ((!input.trim() && files.length === 0) || isLoading) return;
     const text = input;
-    // const attachedFiles = files.filter(f => f.status === 'done'); // Backend handles this
     setInput("");
     setFiles([]);
     await sendMessage({ text });
@@ -48,7 +49,6 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
     }
   };
 
-  // Convert UIMessage to our Message format for MessageBubble
   const displayMessages = messages.map((msg) => ({
     id: msg.id,
     role: msg.role as 'user' | 'assistant',
@@ -84,13 +84,13 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
 
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-zinc-950 dark:via-zinc-950/90 pt-10 pb-4 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto flex flex-col gap-2">
-          
+
           <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
             <div className="flex items-end w-full">
-              <FileUpload 
-                onFilesChange={setFiles} 
-                workspaceId={workspaceId ?? "default"} 
-                context={{ roleSlug: role.slug }}
+              <FileUpload
+                onFilesChange={setFiles}
+                workspaceId={workspaceId ?? "default"}
+                context={{ roleSlug: role.slug, chatId, projectId }}
               />
               <Textarea
                 value={input}

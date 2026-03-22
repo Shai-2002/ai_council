@@ -1,31 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Layers, FileText, ChevronDown, ChevronRight, Folder, MessageSquare, Plus, Trash2 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { ROLES } from "@/lib/roles-config";
-import { MOCK_PROJECTS, MOCK_CHAT_HISTORY } from "@/lib/mock-sidebar-data";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { onDeleteProject, onDeleteChat, onCreateChat } from "@/lib/placeholder";
+import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { UserMenu } from "@/components/shared/UserMenu";
 import { Separator } from "@/components/ui/separator";
 
-// Helper to reliably render lucide icons by name
 function IconByName({ name, className }: { name: string; className?: string }) {
   const Icon = (LucideIcons as unknown as Record<string, React.ElementType>)[name];
   if (!Icon) return <Layers className={className} />;
   return <Icon className={className} />;
 }
 
+interface SidebarProject {
+  id: string;
+  name: string;
+  description: string;
+  chats: Array<{ id: string; title: string; role_slug: string }>;
+}
+
+interface SidebarChat {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
 export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  
+  const { workspaceId } = useWorkspace();
+
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
   const [expandedHistory, setExpandedHistory] = useState<string[]>([]);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+
+  const [projects, setProjects] = useState<SidebarProject[]>([]);
+  const [chatHistory, setChatHistory] = useState<Record<string, SidebarChat[]>>({});
+
+  const loadData = useCallback(async () => {
+    if (!workspaceId) return;
+
+    // Fetch projects with their chats
+    try {
+      const projRes = await fetch(`/api/projects?workspaceId=${workspaceId}`);
+      if (projRes.ok) {
+        const projData = await projRes.json();
+        // For each project, fetch its chats
+        const enriched = await Promise.all(
+          projData.map(async (p: { id: string; name: string; description: string }) => {
+            const chatsRes = await fetch(`/api/chats?workspaceId=${workspaceId}&projectId=${p.id}`);
+            const chats = chatsRes.ok ? await chatsRes.json() : [];
+            return { ...p, chats: chats.map((c: { id: string; title: string; role_slug: string }) => ({ id: c.id, title: c.title, role_slug: c.role_slug })) };
+          })
+        );
+        setProjects(enriched);
+      }
+    } catch { /* ignore */ }
+
+    // Fetch chat history grouped by role
+    try {
+      const chatsRes = await fetch(`/api/chats?workspaceId=${workspaceId}`);
+      if (chatsRes.ok) {
+        const allChats = await chatsRes.json();
+        const grouped: Record<string, SidebarChat[]> = {};
+        for (const chat of allChats) {
+          if (chat.role_slug && !chat.project_id) {
+            if (!grouped[chat.role_slug]) grouped[chat.role_slug] = [];
+            grouped[chat.role_slug].push({ id: chat.id, title: chat.title, updated_at: chat.updated_at });
+          }
+        }
+        setChatHistory(grouped);
+      }
+    } catch { /* ignore */ }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleProject = (id: string) => {
     setExpandedProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
@@ -39,8 +96,21 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
     e.preventDefault();
     e.stopPropagation();
     const chat = await onCreateChat({ title: "New chat", roleSlug });
+    loadData();
     router.push(`/${roleSlug}/chat/${chat.id}`);
     if (onNavigate) onNavigate();
+  };
+
+  const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await onDeleteProject(id);
+    loadData();
+  };
+
+  const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await onDeleteChat(id);
+    loadData();
   };
 
   const handleNavClick = () => {
@@ -51,7 +121,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950">
       {/* Brand */}
       <div className="p-6">
-        <Link href="/dashboard" onClick={handleNavClick} className="flex items-center gap-2 font-semibold text-lg">
+        <Link href="/ceo" onClick={handleNavClick} className="flex items-center gap-2 font-semibold text-lg">
           <Layers className="h-6 w-6 text-indigo-600" />
           <span>AI Roles</span>
         </Link>
@@ -63,15 +133,15 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <p className="px-2 text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">The Council</p>
           {Object.values(ROLES).map((role) => {
             const isActive = pathname === `/${role.slug}`;
-            
+
             return (
               <Link
                 key={role.slug}
                 href={`/${role.slug}`}
                 onClick={handleNavClick}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group ${
-                  isActive 
-                    ? `${role.bgLight} ${role.text} font-medium` 
+                  isActive
+                    ? `${role.bgLight} ${role.text} font-medium`
                     : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900"
                 }`}
               >
@@ -85,7 +155,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   </div>
                   <div className="text-xs opacity-80 font-normal truncate">{role.title}</div>
                 </div>
-                <div 
+                <div
                   onClick={(e) => handleCreateChat(role.slug, e)}
                   title="New chat"
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all cursor-pointer"
@@ -103,7 +173,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <Link href="/projects" onClick={handleNavClick} className="text-xs font-medium text-zinc-500 uppercase tracking-wider hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
               Projects
             </Link>
-            <button 
+            <button
               onClick={() => setIsCreateProjectOpen(true)}
               className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
               title="New project"
@@ -111,12 +181,16 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <Plus className="h-4 w-4" />
             </button>
           </div>
-          
-          {MOCK_PROJECTS.map(project => {
+
+          {projects.length === 0 && (
+            <p className="px-2 text-xs text-zinc-400 dark:text-zinc-500">No projects yet</p>
+          )}
+
+          {projects.map(project => {
             const isExpanded = expandedProjects.includes(project.id);
             return (
               <div key={project.id} className="space-y-0.5">
-                <div 
+                <div
                   className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer group"
                   onClick={() => toggleProject(project.id)}
                 >
@@ -127,28 +201,28 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                        {project.name}
                     </Link>
                   </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
+                  <button
+                    onClick={(e) => handleDeleteProject(project.id, e)}
                     className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity ml-2 shrink-0"
                     title="Delete project"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                
+
                 {isExpanded && (
                   <div className="pl-8 pr-2 space-y-0.5 pb-2">
                     {project.chats.map(chat => {
-                      const role = ROLES[chat.roleSlug];
+                      const role = ROLES[chat.role_slug];
                       const isChatActive = pathname === `/projects/${project.id}/chat/${chat.id}`;
                       return (
-                        <Link 
-                          href={`/projects/${project.id}/chat/${chat.id}`} 
+                        <Link
+                          href={`/projects/${project.id}/chat/${chat.id}`}
                           onClick={handleNavClick}
-                          key={chat.id} 
+                          key={chat.id}
                           className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${
-                            isChatActive 
-                              ? `bg-zinc-100 dark:bg-zinc-800 ${role?.text || 'text-zinc-900 dark:text-zinc-100'} font-medium` 
+                            isChatActive
+                              ? `bg-zinc-100 dark:bg-zinc-800 ${role?.text || 'text-zinc-900 dark:text-zinc-100'} font-medium`
                               : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
                           }`}
                         >
@@ -168,15 +242,15 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         {/* CHAT HISTORY */}
         <div className="space-y-1 mt-6">
           <p className="px-2 text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">Chat History</p>
-          
+
           {Object.values(ROLES).map(role => {
-            const chats = MOCK_CHAT_HISTORY[role.slug];
+            const chats = chatHistory[role.slug];
             if (!chats || chats.length === 0) return null;
-            
+
             const isExpanded = expandedHistory.includes(role.slug);
             return (
               <div key={role.slug} className="space-y-0.5">
-                <div 
+                <div
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
                   onClick={() => toggleHistory(role.slug)}
                 >
@@ -185,28 +259,28 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     {role.name} chats
                   </Link>
                 </div>
-                
+
                 {isExpanded && (
                   <div className="pl-8 pr-2 space-y-0.5 pb-2">
                     {chats.map(chat => {
                       const isChatActive = pathname === `/${role.slug}/chat/${chat.id}`;
                       return (
                         <div key={chat.id} className="flex items-center justify-between group">
-                          <Link 
-                            href={`/${role.slug}/chat/${chat.id}`} 
+                          <Link
+                            href={`/${role.slug}/chat/${chat.id}`}
                             onClick={handleNavClick}
                             className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors truncate flex-1 ${
-                              isChatActive 
-                                ? `bg-zinc-100 dark:bg-zinc-800 ${role.text} font-medium` 
+                              isChatActive
+                                ? `bg-zinc-100 dark:bg-zinc-800 ${role.text} font-medium`
                                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
                             }`}
                           >
                             <MessageSquare className="h-3 w-3 shrink-0 opacity-70" />
                             <span className="truncate">{chat.title}</span>
                           </Link>
-                          <button 
+                          <button
                             title="Delete chat"
-                            onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
+                            onClick={(e) => handleDeleteChat(chat.id, e)}
                             className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity px-1 shrink-0"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -227,8 +301,8 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
             href="/artifacts"
             onClick={handleNavClick}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-              pathname === "/artifacts" 
-                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium" 
+              pathname === "/artifacts"
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900"
             }`}
           >
@@ -241,8 +315,8 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
             href="/pricing"
             onClick={handleNavClick}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-              pathname === "/pricing" 
-                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium" 
+              pathname === "/pricing"
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900"
             }`}
           >
@@ -260,9 +334,12 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <UserMenu />
       </div>
 
-      <CreateProjectDialog 
-        open={isCreateProjectOpen} 
-        onOpenChange={setIsCreateProjectOpen} 
+      <CreateProjectDialog
+        open={isCreateProjectOpen}
+        onOpenChange={(open) => {
+          setIsCreateProjectOpen(open);
+          if (!open) loadData();
+        }}
       />
     </div>
   );
