@@ -1,0 +1,142 @@
+import { streamText } from 'ai';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { roleModel } from '@/lib/ai/provider';
+import { ROLE_CONFIGS } from '@/lib/ai/roles';
+import type { RoleSlug } from '@/types';
+
+export async function POST(req: Request) {
+  const { messages, roleSlug, workspaceId } = await req.json();
+
+  // Validate role
+  const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
+  if (!roleConfig) {
+    return new Response('Invalid role', { status: 400 });
+  }
+
+  // Create server supabase client
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server component context
+          }
+        },
+      },
+    }
+  );
+
+  // Verify auth
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  // Fetch workspace context
+  let companyContext = '';
+  if (workspaceId) {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('company_context')
+      .eq('id', workspaceId)
+      .single();
+
+    if (workspace?.company_context && Object.keys(workspace.company_context).length > 0) {
+      companyContext = `\n\nCOMPANY CONTEXT:\n${JSON.stringify(workspace.company_context, null, 2)}`;
+    }
+  }
+
+  // Fetch cross-role artifacts (5 most recent from OTHER roles)
+  let crossRoleContext = '';
+  if (workspaceId) {
+    const { data: artifacts } = await supabase
+      .from('artifacts')
+      .select('role_slug, artifact_type, title, structured_data, created_at')
+      .eq('workspace_id', workspaceId)
+      .neq('role_slug', roleSlug)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (artifacts && artifacts.length > 0) {
+      const summaries = artifacts.map(
+        (a) => `[${a.role_slug.toUpperCase()} - ${a.artifact_type}] "${a.title}" (${new Date(a.created_at).toLocaleDateString()})`
+      );
+      crossRoleContext = `\n\nRECENT ARTIFACTS FROM OTHER ROLES (use these for cross-role awareness):\n${summaries.join('\n')}`;
+    }
+  }
+
+  // Build full system prompt
+  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}`;
+
+  // Stream the response
+  const result = streamText({
+    model: roleModel,
+    system: systemPrompt,
+    messages,
+    onFinish: async ({ text }) => {
+      if (!workspaceId) return;
+
+      // Save the user's last message and assistant response
+      const lastUserMessage = messages[messages.length - 1];
+      if (lastUserMessage?.role === 'user') {
+        await supabase.from('messages').insert({
+          workspace_id: workspaceId,
+          role_slug: roleSlug,
+          sender: 'user',
+          content: lastUserMessage.content,
+        });
+      }
+
+      await supabase.from('messages').insert({
+        workspace_id: workspaceId,
+        role_slug: roleSlug,
+        sender: 'assistant',
+        content: text,
+      });
+
+      // Try to detect and save artifact from JSON in response
+      const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          const validation = roleConfig.outputSchema.safeParse(parsed);
+
+          if (validation.success) {
+            // Generate a title from the artifact
+            const title =
+              parsed.decision ||
+              parsed.objective ||
+              parsed.summary ||
+              parsed.problem ||
+              parsed.positioning ||
+              `${roleConfig.artifactType} — ${new Date().toLocaleDateString()}`;
+
+            await supabase.from('artifacts').insert({
+              workspace_id: workspaceId,
+              role_slug: roleSlug,
+              artifact_type: roleConfig.artifactType,
+              title: typeof title === 'string' ? title.slice(0, 200) : String(title).slice(0, 200),
+              structured_data: validation.data,
+              status: 'draft',
+            });
+          }
+        } catch {
+          // JSON parsing failed — not an artifact response, ignore
+        }
+      }
+    },
+  });
+
+  return result.toDataStreamResponse();
+}
