@@ -127,7 +127,7 @@ function formatMarketingBrief(title: string, d: Record<string, unknown>): string
 export function artifactToHtml(artifact: ArtifactExportInput): string {
   const md = artifactToMarkdown(artifact);
   // Simple markdown-to-HTML conversion for export
-  let html = md
+  const html = md
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
