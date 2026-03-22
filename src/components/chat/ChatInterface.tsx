@@ -23,12 +23,11 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
   });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const isLoading = status === 'streaming' || status === 'submitted';
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
@@ -75,6 +74,7 @@ export function ChatInterface({ role, workspaceId }: { role: Role; workspaceId?:
                </div>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       </div>
 
