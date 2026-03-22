@@ -1,5 +1,7 @@
 import { Message, Role } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export function MessageBubble({ message, role }: { message: Message; role: Role }) {
   const isUser = message.role === "user";
@@ -26,26 +28,44 @@ export function MessageBubble({ message, role }: { message: Message; role: Role 
               </span>
             )}
           </div>
-          
-          <div 
-            className={`px-4 py-3 rounded-2xl whitespace-pre-wrap text-sm leading-relaxed
-              ${isUser 
-                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-tr-sm" 
+
+          <div
+            className={`px-4 py-3 rounded-2xl text-sm leading-relaxed
+              ${isUser
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-tr-sm whitespace-pre-wrap"
                 : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-tl-sm"
               }
             `}
           >
-            {/* Hacky markdown renderer for strong/italic since we aren't using MD library */}
-            {message.content.split('\n').map((line, i) => {
-              if (line.startsWith('**') && line.includes('**', 2)) {
-                const parts = line.split('**');
-                return <p key={i} className={i !== 0 ? "mt-3" : ""}><strong className="font-semibold">{parts[1]}</strong>{parts[2]}</p>;
-              }
-              if (line.startsWith('*') && line.endsWith('*')) {
-                return <p key={i} className={`mt-4 italic opacity-80 ${isUser ? "" : role.text}`}>{line.slice(1, -1)}</p>;
-              }
-              return <p key={i} className={i !== 0 ? "mt-3" : ""}>{line}</p>;
-            })}
+            {isUser ? (
+              message.content
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  h1: ({ children }) => <h3 className="text-lg font-semibold mt-3 mb-1">{children}</h3>,
+                  h2: ({ children }) => <h3 className="text-base font-semibold mt-3 mb-1">{children}</h3>,
+                  h3: ({ children }) => <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>,
+                  hr: () => <hr className="my-3 border-border" />,
+                  code: ({ className, children, ...props }) => {
+                    const isInline = !className;
+                    if (isInline) {
+                      return <code className="bg-muted px-1.5 py-0.5 rounded text-sm" {...props}>{children}</code>;
+                    }
+                    return <pre className="bg-muted p-3 rounded-lg overflow-x-auto my-2"><code className="text-sm" {...props}>{children}</code></pre>;
+                  },
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+              </div>
+            )}
           </div>
         </div>
       </div>
