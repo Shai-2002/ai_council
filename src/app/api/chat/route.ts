@@ -108,21 +108,29 @@ export async function POST(req: Request) {
   let projectContext = '';
   const resolvedProjectId = projectId || null;
   if (resolvedProjectId && chatId) {
-    const { data: projectChats } = await supabase
-      .from('messages')
-      .select('content, role_slug, chat_id, created_at, chats:chat_id(title)')
-      .eq('workspace_id', workspaceId)
-      .neq('chat_id', chatId)
-      .eq('sender', 'assistant')
-      .order('created_at', { ascending: false })
-      .limit(3);
+    // First get chat IDs within this project (excluding current chat)
+    const { data: projectChatIds } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('project_id', resolvedProjectId)
+      .neq('id', chatId);
 
-    if (projectChats && projectChats.length > 0) {
-      projectContext = '\n\nCONTEXT FROM OTHER PROJECT CHATS:\n';
-      projectChats.forEach((m) => {
-        const chatTitle = (m.chats as unknown as { title: string })?.title || 'Unknown chat';
-        projectContext += `• Chat "${chatTitle}" (${(m.role_slug || 'unknown').toUpperCase()}): ${m.content.substring(0, 150)}...\n`;
-      });
+    if (projectChatIds && projectChatIds.length > 0) {
+      const chatIds = projectChatIds.map(c => c.id);
+      const { data: projectChats } = await supabase
+        .from('messages')
+        .select('content, role_slug, chat_id, created_at')
+        .in('chat_id', chatIds)
+        .eq('sender', 'assistant')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (projectChats && projectChats.length > 0) {
+        projectContext = '\n\nCONTEXT FROM OTHER PROJECT CHATS:\n';
+        projectChats.forEach((m) => {
+          projectContext += `• ${(m.role_slug || 'unknown').toUpperCase()}: ${m.content.substring(0, 150)}...\n`;
+        });
+      }
     }
   }
 
