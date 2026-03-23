@@ -49,6 +49,14 @@ export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBub
             <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold ${role.bgDark} text-white`}>
               {role.title || "AI"}
             </span>
+            {(content.toLowerCase().includes('i disagree') ||
+              content.toLowerCase().includes('that contradicts') ||
+              content.toLowerCase().includes('i would push back') ||
+              content.toLowerCase().includes("i'm not aligned")) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                Conflict
+              </span>
+            )}
           </div>
 
           <div

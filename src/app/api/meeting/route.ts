@@ -183,7 +183,17 @@ export async function POST(req: Request) {
           conversationContext ? `\nMEETING CONVERSATION SO FAR:\n${conversationContext}` : '',
           artifactContext ? `\nRECENT DECISIONS:\n${artifactContext}` : '',
           fileContext,
-          '\nKeep your response focused. Other executives may respond after you. Do not repeat what others have already said. If you disagree with another executive\'s point, say so directly.',
+          `\nKeep your response focused. Other executives may respond after you. Do not repeat what others have already said.
+
+When you see another executive's point that you disagree with, you MUST:
+1. Name the executive and their specific claim
+2. State your disagreement clearly with "I disagree with [name] on [topic]"
+3. Provide your counter-argument with evidence
+Do NOT be diplomatic about genuine disagreements. The user needs to see where the executive team is NOT aligned.
+
+At the END of your response, if you believe another executive should weigh in on something you said, add a line:
+[SUGGEST: @RoleName should respond to my point about X]
+This will be shown to the user as a suggestion, not an automatic trigger.`,
         ].filter(Boolean).join('\n\n');
 
         try {
