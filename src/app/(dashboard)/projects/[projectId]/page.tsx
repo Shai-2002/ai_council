@@ -31,12 +31,14 @@ interface ProjectData {
 export default function ProjectDetail() {
   const { projectId } = useParams();
   const router = useRouter();
-  useWorkspace(); // ensure context is available
+  // workspaceId used below for meeting room
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chats");
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
+  const [meetingChatId, setMeetingChatId] = useState<string | null>(null);
+  const { workspaceId } = useWorkspace();
 
   useEffect(() => {
     if (!projectId) return;
@@ -49,6 +51,47 @@ export default function ProjectDetail() {
     }
     load();
   }, [projectId]);
+
+  // Find or create a meeting room for this project
+  useEffect(() => {
+    if (!workspaceId || !projectId || !project) return;
+    async function loadMeetingRoom() {
+      try {
+        const res = await fetch(`/api/chats?workspaceId=${workspaceId}&projectId=${projectId}&type=meeting_room`);
+        if (res.ok) {
+          const chats = await res.json();
+          if (chats.length > 0) {
+            setMeetingChatId(chats[0].id);
+          }
+          // Don't auto-create — only create when user opens the tab
+        }
+      } catch { /* ignore */ }
+    }
+    loadMeetingRoom();
+  }, [workspaceId, projectId, project]);
+
+  const ensureMeetingRoom = async () => {
+    if (meetingChatId) return meetingChatId;
+    if (!workspaceId || !projectId) return null;
+    try {
+      const res = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          title: `${project?.name || 'Project'} Meeting Room`,
+          projectId,
+          chatType: 'meeting_room',
+        }),
+      });
+      if (res.ok) {
+        const chat = await res.json();
+        setMeetingChatId(chat.id);
+        return chat.id;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center h-full text-zinc-400">Loading project...</div>;
@@ -157,7 +200,7 @@ export default function ProjectDetail() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
+        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); if (val === 'meeting-room') ensureMeetingRoom(); }} className="mt-8">
           <TabsList className="bg-zinc-200/50 dark:bg-zinc-900 p-1 rounded-xl h-12 w-full sm:w-auto inline-flex mb-6">
             <TabsTrigger value="chats" className="rounded-lg px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm text-sm">
               <MessageSquare className="h-4 w-4 mr-2" /> Chats
@@ -218,7 +261,16 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="meeting-room" className="outline-none h-[600px] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden mt-4 bg-white dark:bg-zinc-950">
-            <MeetingRoomChat chatId={`project-meeting-${project.id}`} workspaceId="default" projectId={project.id} />
+            {meetingChatId ? (
+              <MeetingRoomChat chatId={meetingChatId} workspaceId={workspaceId || "default"} projectId={project.id} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <p className="text-zinc-500 mb-4">No meeting room for this project yet.</p>
+                <Button onClick={ensureMeetingRoom} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" /> Create Meeting Room
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

@@ -170,7 +170,7 @@ export async function onDeleteProject(id: string) {
   if (!res.ok) throw new Error('Failed to delete project');
 }
 
-export async function onCreateChat(params: { title: string; projectId?: string; roleSlug?: string }) {
+export async function onCreateChat(params: { title: string; projectId?: string; roleSlug?: string; chatType?: string }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -192,7 +192,7 @@ export async function onCreateChat(params: { title: string; projectId?: string; 
       title: params.title,
       projectId: params.projectId || null,
       roleSlug: params.roleSlug || null,
-      chatType: 'single',
+      chatType: params.chatType || 'single',
     }),
   });
   if (!res.ok) throw new Error('Failed to create chat');

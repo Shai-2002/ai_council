@@ -21,7 +21,7 @@ export default function MeetingRoomInstancePage() {
         const res = await fetch(`/api/chats/${chatId}`);
         if (res.ok) {
            const data = await res.json();
-           if (data.chat?.title) setChatTitle(data.chat.title);
+           if (data.title) setChatTitle(data.title);
         }
       } catch { /* ignore */ }
     }

@@ -27,7 +27,7 @@ export default function MeetingRoomIndexPage() {
         const res = await fetch(`/api/chats?workspaceId=${workspaceId}`);
         if (res.ok) {
           const allChats = await res.json();
-          const meetings = allChats.filter((c: { project_id?: string; role_slug?: string; id: string; title?: string; updated_at: string }) => !c.project_id && (!c.role_slug || c.role_slug === "meeting_room"));
+          const meetings = allChats.filter((c: { project_id?: string; chat_type?: string; id: string; title?: string; updated_at: string }) => !c.project_id && c.chat_type === 'meeting_room');
           setMeetingRooms(meetings.map((m: { id: string; title?: string; updated_at: string }) => ({
             id: m.id,
             title: m.title || "Meeting Room",
@@ -44,7 +44,7 @@ export default function MeetingRoomIndexPage() {
   }, [workspaceId]);
 
   const handleCreateMeetingRoom = async () => {
-    const chat = await onCreateChat({ title: "New Meeting Room" });
+    const chat = await onCreateChat({ title: "New Meeting Room", chatType: "meeting_room" });
     router.push(`/meeting-room/${chat.id}`);
   };
 

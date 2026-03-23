@@ -74,11 +74,11 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         const meetings: SidebarChat[] = [];
         for (const chat of allChats) {
           if (!chat.project_id) {
-            if (chat.role_slug) {
+            if (chat.chat_type === 'meeting_room') {
+              meetings.push({ id: chat.id, title: chat.title || 'Meeting Room', updated_at: chat.updated_at });
+            } else if (chat.role_slug) {
               if (!grouped[chat.role_slug]) grouped[chat.role_slug] = [];
               grouped[chat.role_slug].push({ id: chat.id, title: chat.title, updated_at: chat.updated_at });
-            } else if (chat.role_slug === 'meeting_room' || !chat.role_slug) {
-              meetings.push({ id: chat.id, title: chat.title || 'Meeting Room', updated_at: chat.updated_at });
             }
           }
         }
@@ -112,7 +112,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const handleCreateMeetingRoom = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const chat = await onCreateChat({ title: "New Meeting Room" });
+    const chat = await onCreateChat({ title: "New Meeting Room", chatType: "meeting_room" });
     loadData();
     router.push(`/meeting-room/${chat.id}`);
     if (onNavigate) onNavigate();
