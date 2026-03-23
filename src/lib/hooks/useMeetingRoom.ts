@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { parseMentions, type ParsedMessage } from '@/lib/meeting/mention-parser';
+import { parseMentions } from '@/lib/meeting/mention-parser';
 
 interface MeetingMessage {
   id: string;
@@ -19,15 +19,34 @@ interface ActiveRole {
   isStreaming: boolean;
 }
 
+interface PendingSimulation {
+  text: string;
+  fileIds?: string[];
+}
+
 export function useMeetingRoom(chatId: string, workspaceId: string) {
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [activeRoles, setActiveRoles] = useState<ActiveRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSimulationPopup, setShowSimulationPopup] = useState(false);
-  const [pendingSimulation, setPendingSimulation] = useState<ParsedMessage | null>(null);
+  const [pendingSimulation, setPendingSimulation] = useState<PendingSimulation | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const sendMessage = useCallback(async (text: string, fileIds?: string[]) => {
+  const sendMessage = useCallback(async (text: string, fileIds?: string[], skipSimulationCheck?: boolean) => {
+    const parsed = parseMentions(text);
+
+    if (parsed.mentions.length === 0) {
+      // No mentions — the API will return an error, so just skip
+      return;
+    }
+
+    // Check for simulation BEFORE sending to API (prevents infinite loop)
+    if (!skipSimulationCheck && parsed.isSimulationCandidate) {
+      setPendingSimulation({ text, fileIds });
+      setShowSimulationPopup(true);
+      return; // Don't send yet — wait for user approval
+    }
+
     // Add user message to UI immediately
     const userMsg: MeetingMessage = {
       id: `user-${Date.now()}`,
@@ -51,16 +70,9 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
 
       const contentType = res.headers.get('content-type');
 
-      // Check if it's a simulation candidate response (JSON, not SSE)
+      // Handle JSON error responses
       if (contentType?.includes('application/json')) {
         const data = await res.json();
-        if (data.type === 'simulation_candidate') {
-          const parsed = parseMentions(text);
-          setPendingSimulation(parsed);
-          setShowSimulationPopup(true);
-          setIsLoading(false);
-          return;
-        }
         if (data.error) {
           console.error('Meeting API error:', data.error);
           setIsLoading(false);
@@ -155,13 +167,16 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
   const approveSimulation = useCallback(() => {
     setShowSimulationPopup(false);
     if (pendingSimulation) {
-      sendMessage(pendingSimulation.rawText);
+      // Send with skipSimulationCheck = true to bypass the check
+      sendMessage(pendingSimulation.text, pendingSimulation.fileIds, true);
     }
     setPendingSimulation(null);
   }, [pendingSimulation, sendMessage]);
 
   const denySimulation = useCallback(() => {
     setShowSimulationPopup(false);
+    // Message was NOT sent to API, so nothing to clean up
+    // The typed text remains in the input
     setPendingSimulation(null);
   }, []);
 

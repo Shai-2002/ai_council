@@ -95,17 +95,19 @@ export function parseMentions(text: string): ParsedMessage {
     }, {} as Record<string, ParsedMention>)
   );
 
-  // Simulation detection: 3+ unique roles tagged + discussion keywords
+  // Simulation detection: 3+ unique roles + very specific simulation keywords
+  // Normal multi-role tagging (e.g. "@aria @dev @kai what do you think?") should NOT trigger this.
+  // Only explicit simulation requests should trigger the popup.
   const lowerText = text.toLowerCase();
-  const isSimulationCandidate = uniqueRoles.length >= 3 && (
-    lowerText.includes('argue') ||
-    lowerText.includes('discuss') ||
-    lowerText.includes('debate') ||
-    lowerText.includes('simulation') ||
-    lowerText.includes('after everyone') ||
-    lowerText.includes('push them') ||
-    dedupedMentions.every(m => m.instruction.length > 20)
-  );
+  const simulationKeywords = [
+    'simulate', 'simulation', 'run simulation',
+    'argue with each other', 'debate each other', 'discuss among yourselves',
+    'after everyone gives their answers', 'after everyone responds',
+    'push them to the edge', 'challenge each other',
+    'let them discuss', 'let them debate', 'let them argue',
+  ];
+  const isSimulationCandidate = uniqueRoles.length >= 3 &&
+    simulationKeywords.some(kw => lowerText.includes(kw));
 
   return {
     mentions: dedupedMentions,

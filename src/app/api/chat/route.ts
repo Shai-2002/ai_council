@@ -126,15 +126,12 @@ export async function POST(req: Request) {
     }
   }
 
-  // ===== LAYER 5: File context =====
-  // Fetch ALL recent files for this context (chat > project > role > workspace)
-  // The user message includes "[Attached files: X, Y]" when files are uploaded
+  // ===== LAYER 5: File context (scoped — no workspace-wide leak) =====
   let fileContext = '';
   if (workspaceId) {
-    // Try multiple scopes: chat-specific → project → role → workspace recent
-    let allFiles: Array<{ name: string; extracted_text: string | null }> = [];
+    const allFiles: Array<{ name: string; extracted_text: string | null }> = [];
 
-    // Scope 1: Files associated with this specific chat
+    // Scope 1: Files in this specific chat
     if (chatId) {
       const { data } = await supabase
         .from('files')
@@ -144,11 +141,11 @@ export async function POST(req: Request) {
         .not('extracted_text', 'is', null)
         .order('created_at', { ascending: false })
         .limit(5);
-      if (data && data.length > 0) allFiles = data;
+      if (data) allFiles.push(...data);
     }
 
-    // Scope 2: Files in same project
-    if (allFiles.length === 0 && resolvedProjectId) {
+    // Scope 2: Files in same project (additive, not fallback)
+    if (resolvedProjectId) {
       const { data } = await supabase
         .from('files')
         .select('name, extracted_text')
@@ -156,41 +153,40 @@ export async function POST(req: Request) {
         .eq('extraction_status', 'done')
         .not('extracted_text', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(5);
-      if (data && data.length > 0) allFiles = data;
+        .limit(3);
+      if (data) allFiles.push(...data);
     }
 
-    // Scope 3: Files tagged with this role
-    if (allFiles.length === 0 && roleSlug) {
+    // Scope 3: Files tagged with this role's independent pool (only for single chats)
+    if (roleSlug && !resolvedProjectId) {
       const { data } = await supabase
         .from('files')
         .select('name, extracted_text')
         .eq('workspace_id', workspaceId)
         .eq('role_slug', roleSlug)
+        .is('chat_id', null)
+        .is('project_id', null)
         .eq('extraction_status', 'done')
         .not('extracted_text', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(3);
-      if (data && data.length > 0) allFiles = data;
+        .limit(2);
+      if (data) allFiles.push(...data);
     }
 
-    // Scope 4: Any recent workspace files
-    if (allFiles.length === 0) {
-      const { data } = await supabase
-        .from('files')
-        .select('name, extracted_text')
-        .eq('workspace_id', workspaceId)
-        .eq('extraction_status', 'done')
-        .not('extracted_text', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      if (data && data.length > 0) allFiles = data;
-    }
+    // NO Scope 4 workspace-wide fallback — prevents cross-chat file leaking
 
-    if (allFiles.length > 0) {
+    // Deduplicate by name
+    const seen = new Set<string>();
+    const uniqueFiles = allFiles.filter(f => {
+      if (seen.has(f.name)) return false;
+      seen.add(f.name);
+      return true;
+    });
+
+    if (uniqueFiles.length > 0) {
       fileContext = '\n\nUPLOADED DOCUMENTS (the user has uploaded these — reference them when relevant):\n';
-      allFiles.forEach((f) => {
-        const text = f.extracted_text?.substring(0, 2000) || '';
+      uniqueFiles.forEach((f) => {
+        const text = f.extracted_text?.substring(0, 1500) || '';
         if (text) {
           fileContext += `--- ${f.name} ---\n${text}\n---\n\n`;
         }

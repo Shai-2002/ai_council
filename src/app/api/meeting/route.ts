@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   if (!user) return new Response('Unauthorized', { status: 401 });
 
   const body = await req.json();
-  const { message, chatId, workspaceId } = body;
+  const { message, chatId, workspaceId, fileIds } = body;
 
   if (!message || !chatId || !workspaceId) {
     return Response.json({ error: 'message, chatId, and workspaceId required' }, { status: 400 });
@@ -48,30 +48,82 @@ export async function POST(req: Request) {
     content: message,
   });
 
-  // If simulation candidate, return flag for frontend popup
-  if (parsed.isSimulationCandidate) {
-    return Response.json({
-      type: 'simulation_candidate',
-      mentions: parsed.mentions,
-      rawText: message,
-    });
+  // NOTE: No simulation_candidate JSON response — simulation detection is handled
+  // entirely on the frontend BEFORE sending to this API. This prevents the infinite
+  // loop where approveSimulation re-sends the message and it's detected again.
+
+  // ===== File context (scoped, no workspace-wide leak) =====
+  let fileContext = '';
+
+  // 1. Explicitly attached files
+  if (fileIds && fileIds.length > 0) {
+    const { data: attachedFiles } = await supabase
+      .from('files')
+      .select('name, extracted_text')
+      .in('id', fileIds)
+      .eq('workspace_id', workspaceId);
+
+    if (attachedFiles?.length) {
+      fileContext += attachedFiles
+        .filter(f => f.extracted_text)
+        .map(f => `--- ${f.name} ---\n${f.extracted_text?.slice(0, 2000)}\n---`)
+        .join('\n\n');
+    }
   }
 
-  // Get file context
-  let fileContext = '';
-  const { data: files } = await supabase
-    .from('files')
-    .select('name, extracted_text')
-    .eq('workspace_id', workspaceId)
-    .eq('extraction_status', 'done')
-    .not('extracted_text', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(3);
+  // 2. Files uploaded in this specific chat
+  if (chatId) {
+    const { data: chatFiles } = await supabase
+      .from('files')
+      .select('id, name, extracted_text')
+      .eq('chat_id', chatId)
+      .eq('workspace_id', workspaceId)
+      .eq('extraction_status', 'done')
+      .not('extracted_text', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(3);
 
-  if (files && files.length > 0) {
-    fileContext = '\nUPLOADED DOCUMENTS:\n' + files
-      .map(f => `--- ${f.name} ---\n${f.extracted_text?.slice(0, 2000)}\n---`)
-      .join('\n\n');
+    if (chatFiles?.length) {
+      const attachedIds = new Set(fileIds || []);
+      const newFiles = chatFiles.filter(f => !attachedIds.has(f.id));
+      if (newFiles.length > 0) {
+        fileContext += '\n\n' + newFiles
+          .map(f => `--- ${f.name} ---\n${f.extracted_text?.slice(0, 1500)}\n---`)
+          .join('\n\n');
+      }
+    }
+  }
+
+  // 3. Project knowledge pool (if chat is in a project)
+  // Look up project_id from the chat
+  const { data: chatRecord } = await supabase
+    .from('chats')
+    .select('project_id')
+    .eq('id', chatId)
+    .single();
+
+  if (chatRecord?.project_id) {
+    const { data: projectFiles } = await supabase
+      .from('files')
+      .select('name, extracted_text')
+      .eq('project_id', chatRecord.project_id)
+      .eq('workspace_id', workspaceId)
+      .eq('extraction_status', 'done')
+      .not('extracted_text', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (projectFiles?.length) {
+      fileContext += '\n\n' + projectFiles
+        .map(f => `--- ${f.name} (project) ---\n${f.extracted_text?.slice(0, 1500)}\n---`)
+        .join('\n\n');
+    }
+  }
+
+  // NOTE: No workspace-wide fallback — prevents file leaking across chats
+
+  if (fileContext) {
+    fileContext = '\nUPLOADED DOCUMENTS:\n' + fileContext;
   }
 
   // Get workspace context
