@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   // V6 transport sends: { trigger, chatId, messages, ...customBody }
-  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId } = body;
+  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId, fileIds } = body;
 
   // Validate role
   const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
@@ -127,34 +127,51 @@ export async function POST(req: Request) {
   }
 
   // ===== LAYER 5: File context =====
+  // Priority: explicitly attached fileIds > chat files > project files > role files
   let fileContext = '';
   if (workspaceId) {
-    // Build file query: chat files > project files > role files
-    let fileQuery = supabase
-      .from('files')
-      .select('name, extracted_text, file_type')
-      .eq('workspace_id', workspaceId)
-      .eq('extraction_status', 'done')
-      .not('extracted_text', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(3);
+    let allFiles: Array<{ name: string; extracted_text: string | null }> = [];
 
-    if (chatId) {
-      fileQuery = fileQuery.eq('chat_id', chatId);
-    } else if (resolvedProjectId) {
-      fileQuery = fileQuery.eq('project_id', resolvedProjectId);
-    } else if (roleSlug) {
-      fileQuery = fileQuery.eq('role_slug', roleSlug);
+    // First: fetch explicitly attached files (sent with this message)
+    if (Array.isArray(fileIds) && fileIds.length > 0) {
+      const { data: attachedFiles } = await supabase
+        .from('files')
+        .select('name, extracted_text')
+        .in('id', fileIds)
+        .eq('extraction_status', 'done');
+
+      if (attachedFiles) allFiles = attachedFiles;
     }
 
-    const { data: files } = await fileQuery;
+    // If no explicit files, fall back to associated files
+    if (allFiles.length === 0) {
+      let fileQuery = supabase
+        .from('files')
+        .select('name, extracted_text')
+        .eq('workspace_id', workspaceId)
+        .eq('extraction_status', 'done')
+        .not('extracted_text', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(3);
 
-    if (files && files.length > 0) {
-      fileContext = '\n\nUPLOADED DOCUMENTS:\n';
-      files.forEach((f) => {
+      if (chatId) {
+        fileQuery = fileQuery.eq('chat_id', chatId);
+      } else if (resolvedProjectId) {
+        fileQuery = fileQuery.eq('project_id', resolvedProjectId);
+      } else if (roleSlug) {
+        fileQuery = fileQuery.eq('role_slug', roleSlug);
+      }
+
+      const { data: contextFiles } = await fileQuery;
+      if (contextFiles) allFiles = contextFiles;
+    }
+
+    if (allFiles.length > 0) {
+      fileContext = '\n\nATTACHED/UPLOADED DOCUMENTS:\n';
+      allFiles.forEach((f) => {
         const text = f.extracted_text?.substring(0, 1500) || '';
         if (text) {
-          fileContext += `• [${f.name}]: ${text}\n\n`;
+          fileContext += `--- ${f.name} ---\n${text}\n---\n\n`;
         }
       });
     }

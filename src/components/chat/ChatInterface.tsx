@@ -7,7 +7,7 @@ import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal } from "lucide-react";
-import { FileUpload, UploadedFile } from "./FileUpload";
+import { FileUploadButton, FileChips, type UploadedFile } from "./FileUpload";
 
 function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -17,15 +17,17 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
 }
 
 export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string }) {
+  const [fileIds, setFileIds] = useState<string[]>([]);
+
   const { messages, sendMessage, status } = useRoleChat({
     roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,
     chatId: chatId ?? null,
     projectId: projectId ?? null,
+    fileIds,
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [resetSignal, setResetSignal] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
@@ -37,7 +39,6 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
   }, []);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (shouldAutoScroll.current && messagesEndRef.current) {
       requestAnimationFrame(() => {
@@ -46,20 +47,53 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     }
   }, [messages]);
 
-  // Also scroll on initial mount
   useEffect(() => {
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
     });
   }, []);
 
+  const handleFilesUploaded = (newFiles: UploadedFile[]) => {
+    // Merge: replace existing by name, add new ones
+    setFiles(prev => {
+      const map = new Map(prev.map(f => [f.name, f]));
+      newFiles.forEach(f => map.set(f.name, f));
+      return Array.from(map.values());
+    });
+  };
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id));
+  };
+
   const handleSend = async () => {
-    if ((!input.trim() && files.length === 0) || isLoading) return;
-    const text = input;
+    const trimmedInput = input.trim();
+    const doneFiles = files.filter(f => f.status === 'done');
+    const hasFiles = doneFiles.length > 0;
+
+    if (!trimmedInput && !hasFiles) return;
+    if (isLoading) return;
+
+    // Build the message text
+    const text = trimmedInput ||
+      `Please review the attached file${doneFiles.length > 1 ? 's' : ''}: ${doneFiles.map(f => f.name).join(', ')}`;
+
+    // Set file IDs for the transport body before sending
+    const ids = doneFiles.map(f => f.id).filter(Boolean);
+    setFileIds(ids);
+
+    // Clear input and files
     setInput("");
     setFiles([]);
-    setResetSignal(prev => prev + 1);
-    await sendMessage({ text });
+
+    try {
+      await sendMessage({ text });
+    } catch (err) {
+      console.error('Send failed:', err);
+    }
+
+    // Clear file IDs after send
+    setFileIds([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -75,9 +109,12 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     content: getMessageContent(msg),
   }));
 
+  const doneFiles = files.filter(f => f.status === 'done');
+  const hasContent = input.trim() || doneFiles.length > 0;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Messages — scrollable, fills all remaining space */}
+      {/* Messages — scrollable */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
@@ -123,17 +160,20 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
         <div ref={messagesEndRef} className="h-px" />
       </div>
 
-      {/* Input bar — pinned to bottom, never scrolls */}
-      <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 sm:px-6 py-3">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 w-full relative">
-            <div className="flex items-end w-full">
+      {/* Input area — pinned to bottom */}
+      <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+        {/* File chips — ABOVE the input row */}
+        <FileChips files={files} onRemove={removeFile} />
+
+        {/* Input row */}
+        <div className="px-4 sm:px-6 py-3">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 relative">
               <div className="shrink-0 self-end">
-                <FileUpload
-                  onFilesChange={setFiles}
+                <FileUploadButton
                   workspaceId={workspaceId ?? "default"}
                   context={{ roleSlug: role.slug, chatId, projectId }}
-                  resetSignal={resetSignal}
+                  onFilesUploaded={handleFilesUploaded}
                 />
               </div>
               <textarea
@@ -148,22 +188,22 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
                 type="button"
                 size="icon"
                 className={`absolute right-2 bottom-2 h-9 w-9 rounded-xl transition-all ${
-                  input.trim() || files.length > 0
+                  hasContent
                     ? `${role.bgDark} text-white hover:opacity-90`
                     : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-300 dark:hover:bg-zinc-700"
                 }`}
                 onClick={handleSend}
-                disabled={(!input.trim() && files.length === 0) || isLoading}
+                disabled={!hasContent || isLoading}
               >
                 <SendHorizontal className="h-4 w-4" />
                 <span className="sr-only">Send Message</span>
               </Button>
             </div>
-          </div>
-          <div className="text-center mt-2">
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              The {role.title} analyzes your input based on {role.description.toLowerCase()}.
-            </span>
+            <div className="text-center mt-2">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                The {role.title} analyzes your input based on {role.description.toLowerCase()}.
+              </span>
+            </div>
           </div>
         </div>
       </div>
