@@ -281,14 +281,25 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
     if (res.ok) {
       const data = await res.json();
       if (data.messages) {
-        setMessages(data.messages.map((m: { id: string; sender: string; role_slug: string; content: string; created_at: string }) => ({
+        const dbMessages = data.messages.map((m: { id: string; sender: string; role_slug: string; content: string; created_at: string }) => ({
           id: m.id,
           role: m.sender as 'user' | 'assistant',
           roleSlug: m.role_slug,
           roleName: ROLE_NAMES[m.role_slug] || m.role_slug?.toUpperCase(),
           content: m.content,
           timestamp: new Date(m.created_at),
-        })));
+        }));
+
+        setMessages(prev => {
+          if (prev.length === 0) return dbMessages;
+          // Merge: keep existing messages, add any from DB not yet in state
+          const existingIds = new Set(prev.map(m => m.id));
+          const newFromDb = dbMessages.filter((m: MeetingMessage) => !existingIds.has(m.id));
+          if (newFromDb.length === 0) return prev;
+          return [...prev, ...newFromDb].sort((a, b) =>
+            a.timestamp.getTime() - b.timestamp.getTime()
+          );
+        });
       }
     }
   }, [chatId]);
