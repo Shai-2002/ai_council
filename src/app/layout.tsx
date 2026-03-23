@@ -17,6 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+      </head>
       <body className={`${inter.className} min-h-screen antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50`}>
         <TooltipProvider>
           {children}
