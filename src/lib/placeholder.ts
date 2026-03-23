@@ -84,6 +84,17 @@ export async function onSubscribe(plan: string) {
 export async function onLogout() {
   const supabase = createClient();
   await supabase.auth.signOut();
+
+  // Clear all Supabase cookies manually (belt and suspenders)
+  document.cookie.split(';').forEach(cookie => {
+    const name = cookie.split('=')[0].trim();
+    if (name.startsWith('sb-') || name.includes('supabase')) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
+    }
+  });
+
+  // Hard redirect to force full page reload + middleware check
   window.location.href = '/login';
 }
 

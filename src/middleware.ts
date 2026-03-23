@@ -34,15 +34,24 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const protectedPaths = ['/ceo', '/coo', '/cfo', '/product', '/marketing', '/artifacts', '/pricing', '/meeting-room', '/projects', '/settings'];
-  const isProtected = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
+  // Public paths that don't require auth
+  const publicPaths = ['/login', '/signup', '/auth', '/api'];
+  const isPublic =
+    request.nextUrl.pathname === '/' ||
+    publicPaths.some((path) => request.nextUrl.pathname.startsWith(path));
 
-  if (isProtected && !user) {
+  // Everything else is protected (covers custom role slugs too)
+  if (!isPublic && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Clear stale auth cookies on redirect
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith('sb-')) {
+        redirectResponse.cookies.delete(name);
+      }
+    });
+    return redirectResponse;
   }
 
   // Redirect authenticated users away from auth pages
@@ -55,6 +64,13 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/ceo';
     return NextResponse.redirect(url);
+  }
+
+  // Cache-control on protected pages — prevents browser back showing cached dashboard after logout
+  if (!isPublic && user) {
+    supabaseResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    supabaseResponse.headers.set('Pragma', 'no-cache');
+    supabaseResponse.headers.set('Expires', '0');
   }
 
   return supabaseResponse;
