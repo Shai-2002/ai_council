@@ -1,0 +1,20 @@
+{
+  "name": "ai-roles-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "ai": "^6.0.134",
+    "@openrouter/ai-sdk-provider": "^0.4.6"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  }
+}

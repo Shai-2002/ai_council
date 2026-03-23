@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { parseMentions } from '@/lib/meeting/mention-parser';
+import { createClient } from '@/lib/supabase/client';
 
 interface MeetingMessage {
   id: string;
@@ -24,27 +25,90 @@ interface PendingSimulation {
   fileIds?: string[];
 }
 
+const ROLE_NAMES: Record<string, string> = {
+  ceo: 'Aria', coo: 'Dev', cfo: 'Maya', product: 'Kai', marketing: 'Priya',
+};
+
 export function useMeetingRoom(chatId: string, workspaceId: string) {
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [activeRoles, setActiveRoles] = useState<ActiveRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSimulationPopup, setShowSimulationPopup] = useState(false);
   const [pendingSimulation, setPendingSimulation] = useState<PendingSimulation | null>(null);
+  const [simulationRunning, setSimulationRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Subscribe to Realtime for simulation messages (worker inserts to messages table)
+  useEffect(() => {
+    if (!chatId || !simulationRunning) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`simulation-${chatId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `chat_id=eq.${chatId}`,
+      }, (payload) => {
+        const newMsg = payload.new as { id: string; sender: string; role_slug: string; content: string; created_at: string };
+        if (newMsg.sender !== 'assistant') return;
+
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, {
+            id: newMsg.id,
+            role: 'assistant',
+            roleSlug: newMsg.role_slug,
+            roleName: ROLE_NAMES[newMsg.role_slug] || newMsg.role_slug?.toUpperCase(),
+            content: newMsg.content,
+            timestamp: new Date(newMsg.created_at),
+          }];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId, simulationRunning]);
+
+  // Poll simulation job status when running
+  useEffect(() => {
+    if (!simulationRunning) return;
+
+    const supabase = createClient();
+    const interval = setInterval(async () => {
+      // Check if all tagged roles have responded by checking messages
+      const { data } = await supabase
+        .from('simulation_jobs')
+        .select('status')
+        .eq('chat_id', chatId)
+        .eq('status', 'running')
+        .limit(1);
+
+      if (!data || data.length === 0) {
+        // No running jobs — simulation complete
+        setSimulationRunning(false);
+        setIsLoading(false);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [chatId, simulationRunning]);
 
   const sendMessage = useCallback(async (text: string, fileIds?: string[], skipSimulationCheck?: boolean) => {
     const parsed = parseMentions(text);
 
     if (parsed.mentions.length === 0) {
-      // No mentions — the API will return an error, so just skip
       return;
     }
 
-    // Check for simulation BEFORE sending to API (prevents infinite loop)
+    // Check for simulation BEFORE sending to API
     if (!skipSimulationCheck && parsed.isSimulationCandidate) {
       setPendingSimulation({ text, fileIds });
       setShowSimulationPopup(true);
-      return; // Don't send yet — wait for user approval
+      return;
     }
 
     // Add user message to UI immediately
@@ -164,19 +228,51 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
     }
   }, [chatId, workspaceId]);
 
-  const approveSimulation = useCallback(() => {
+  const approveSimulation = useCallback(async () => {
     setShowSimulationPopup(false);
-    if (pendingSimulation) {
-      // Send with skipSimulationCheck = true to bypass the check
-      sendMessage(pendingSimulation.text, pendingSimulation.fileIds, true);
+    if (!pendingSimulation) return;
+
+    // Add user message to UI
+    setMessages(prev => [...prev, {
+      id: `user-${Date.now()}`,
+      role: 'user' as const,
+      content: pendingSimulation.text,
+      timestamp: new Date(),
+    }]);
+
+    setIsLoading(true);
+    setSimulationRunning(true);
+
+    try {
+      // Create simulation job (Railway worker will process it)
+      const res = await fetch('/api/simulation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: pendingSimulation.text,
+          chatId,
+          workspaceId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.simulationId) {
+        console.error('Simulation creation failed:', data);
+        setIsLoading(false);
+        setSimulationRunning(false);
+      }
+      // Messages will arrive via Realtime subscription
+    } catch (error) {
+      console.error('Simulation creation failed:', error);
+      setIsLoading(false);
+      setSimulationRunning(false);
     }
+
     setPendingSimulation(null);
-  }, [pendingSimulation, sendMessage]);
+  }, [pendingSimulation, chatId, workspaceId]);
 
   const denySimulation = useCallback(() => {
     setShowSimulationPopup(false);
-    // Message was NOT sent to API, so nothing to clean up
-    // The typed text remains in the input
     setPendingSimulation(null);
   }, []);
 
@@ -189,7 +285,7 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
           id: m.id,
           role: m.sender as 'user' | 'assistant',
           roleSlug: m.role_slug,
-          roleName: m.role_slug ? m.role_slug.toUpperCase() : undefined,
+          roleName: ROLE_NAMES[m.role_slug] || m.role_slug?.toUpperCase(),
           content: m.content,
           timestamp: new Date(m.created_at),
         })));
@@ -206,6 +302,7 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
     activeRoles,
     isLoading,
     showSimulationPopup,
+    simulationRunning,
     sendMessage,
     approveSimulation,
     denySimulation,
