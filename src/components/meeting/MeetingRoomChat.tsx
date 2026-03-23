@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
+const ROLE_NAMES: Record<string, string> = {
+  ceo: 'Aria', coo: 'Dev', cfo: 'Maya', product: 'Kai', marketing: 'Priya',
+};
+
 interface MeetingRoomChatProps {
   chatId: string;
   workspaceId: string;
@@ -28,6 +32,8 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
     activeRoles,
     isLoading,
     showSimulationPopup,
+    suggestions,
+    setSuggestions,
     sendMessage,
     approveSimulation,
     denySimulation,
@@ -151,10 +157,29 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
         <div ref={messagesEndRef} className="h-px" />
       </div>
 
+      {/* Suggestion chips */}
+      {suggestions.length > 0 && (
+        <div className="shrink-0 px-4 py-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap gap-2 items-center bg-white dark:bg-zinc-950">
+          <span className="text-xs text-zinc-400">Suggested:</span>
+          {suggestions.map(s => (
+            <button
+              key={s.id}
+              onClick={() => {
+                sendMessage(`@${s.suggestedRole} respond to what ${ROLE_NAMES[s.fromRole] || s.fromRole} just said`);
+                setSuggestions(prev => prev.filter(x => x.id !== s.id));
+              }}
+              className="text-xs px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+            >
+              Ask @{ROLE_NAMES[s.suggestedRole] || s.suggestedRole} to respond
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
-      <MentionInput 
-        onSend={(text, fileIds) => sendMessage(text, fileIds)} 
-        disabled={isLoading || showSimulationPopup} 
+      <MentionInput
+        onSend={(text, fileIds) => sendMessage(text, fileIds)}
+        disabled={isLoading || showSimulationPopup}
       />
 
       {/* Simulation Dialog */}

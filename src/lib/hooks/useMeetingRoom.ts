@@ -36,6 +36,7 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
   const [showSimulationPopup, setShowSimulationPopup] = useState(false);
   const [pendingSimulation, setPendingSimulation] = useState<PendingSimulation | null>(null);
   const [simulationRunning, setSimulationRunning] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ id: string; fromRole: string; suggestedRole: string; reason: string }>>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   // Subscribe to Realtime for simulation messages (worker inserts to messages table)
@@ -191,12 +192,29 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
                 break;
 
               case 'role_complete': {
+                // Parse [SUGGEST: @RoleName ...] from the response
+                let cleanContent = currentRoleContent;
+                const suggestMatch = currentRoleContent.match(/\[SUGGEST:\s*@(\w+)\s+should respond.*?\]/i);
+                if (suggestMatch) {
+                  cleanContent = currentRoleContent.replace(/\[SUGGEST:.*?\]/gi, '').trim();
+                  const suggestedRoleName = suggestMatch[1].toLowerCase();
+                  const suggestedSlug = Object.entries(ROLE_NAMES).find(
+                    ([, name]) => name.toLowerCase() === suggestedRoleName
+                  )?.[0] || suggestedRoleName;
+                  setSuggestions(prev => [...prev, {
+                    id: `suggest-${Date.now()}`,
+                    fromRole: currentRoleSlug,
+                    suggestedRole: suggestedSlug,
+                    reason: suggestMatch[0],
+                  }]);
+                }
+
                 const completedMsg: MeetingMessage = {
                   id: `${data.roleSlug}-${Date.now()}`,
                   role: 'assistant',
                   roleSlug: currentRoleSlug,
                   roleName: currentRoleName,
-                  content: currentRoleContent,
+                  content: cleanContent,
                   timestamp: new Date(),
                 };
                 setMessages(prev => [...prev, completedMsg]);
@@ -314,6 +332,8 @@ export function useMeetingRoom(chatId: string, workspaceId: string) {
     isLoading,
     showSimulationPopup,
     simulationRunning,
+    suggestions,
+    setSuggestions,
     sendMessage,
     approveSimulation,
     denySimulation,
