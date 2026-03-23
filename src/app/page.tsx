@@ -1,6 +1,7 @@
 import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { RoleShowcase } from "@/components/landing/RoleShowcase";
+import { MeetingPreview } from "@/components/landing/MeetingPreview";
 import { Footer } from "@/components/landing/Footer";
 import { PricingCards } from "@/components/shared/PricingCards";
 import Link from "next/link";
@@ -32,6 +33,7 @@ export default function LandingPage() {
         <Hero />
         <HowItWorks />
         <RoleShowcase />
+        <MeetingPreview />
         
         {/* Pricing Section inline */}
         <section className="py-24 px-6 bg-zinc-50 dark:bg-zinc-900/50">
