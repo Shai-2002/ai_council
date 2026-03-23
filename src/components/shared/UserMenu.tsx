@@ -14,10 +14,10 @@ import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { LogOut, Settings, User } from "lucide-react";
 
 export function UserMenu() {
-  const { profile } = useWorkspace();
+  const { profile, loading } = useWorkspace();
 
-  const displayName = profile?.full_name || "Solopreneur";
-  const initials = displayName.charAt(0).toUpperCase();
+  const displayName = profile?.full_name || "User";
+  const initials = displayName ? displayName.charAt(0).toUpperCase() : "U";
 
   return (
     <DropdownMenu>
@@ -26,7 +26,9 @@ export function UserMenu() {
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div className="flex-1 overflow-hidden">
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{displayName}</p>
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+            {loading ? "Loading..." : displayName}
+          </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
             {profile?.subscription_status === 'active' ? 'Pro' : 'Free'} plan
           </p>
@@ -35,11 +37,17 @@ export function UserMenu() {
       <DropdownMenuContent className="w-56" align="start" side="right" sideOffset={12}>
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer">
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => { /* Profile page coming in a future wave */ }}
+        >
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => { /* Settings page coming in a future wave */ }}
+        >
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
