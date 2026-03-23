@@ -125,11 +125,9 @@
   html {
     @apply font-sans;
     height: 100%;
-    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground;
     height: 100%;
-    overflow: hidden;
   }
 }
