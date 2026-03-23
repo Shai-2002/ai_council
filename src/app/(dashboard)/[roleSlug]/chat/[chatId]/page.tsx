@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
-import type { RoleSlug } from "@/types";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock } from "lucide-react";
@@ -15,9 +14,10 @@ export default function RoleIndependentChatPage() {
   const router = useRouter();
   const { workspaceId } = useWorkspace();
 
+  const { getRoleBySlug } = useRoles();
   const roleStr = typeof roleSlug === 'string' ? roleSlug : Array.isArray(roleSlug) ? roleSlug[0] : '';
   const chatIdStr = typeof chatId === 'string' ? chatId : Array.isArray(chatId) ? chatId[0] : '';
-  const role = ROLES[roleStr as RoleSlug];
+  const role = getRoleBySlug(roleStr);
 
   const [chat, setChat] = useState<{ id: string; title: string; updated_at: string } | null>(null);
   const [initialMessages, setInitialMessages] = useState<Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }>>([]);

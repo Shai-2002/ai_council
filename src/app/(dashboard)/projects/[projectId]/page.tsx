@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { Folder, ChevronRight, MessageSquare, Plus, FileText, Settings, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ interface ProjectData {
 }
 
 export default function ProjectDetail() {
+  const { rolesMap } = useRoles();
   const { projectId } = useParams();
   const router = useRouter();
   // workspaceId used below for meeting room
@@ -223,7 +224,7 @@ export default function ProjectDetail() {
 
             <div className="grid gap-3">
               {project.chats && project.chats.length > 0 ? project.chats.map(chat => {
-                const role = ROLES[chat.role_slug];
+                const role = rolesMap[chat.role_slug];
                 return (
                   <Link
                     key={chat.id}

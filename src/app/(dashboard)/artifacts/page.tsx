@@ -5,11 +5,12 @@ import { ArtifactGrid } from "@/components/artifacts/ArtifactGrid";
 import { ArtifactDetail } from "@/components/artifacts/ArtifactDetail";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { createClient } from "@/lib/supabase/client";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import type { Artifact } from "@/types";
 import type { ExtractedTask } from "@/lib/task-extraction";
 
 export default function ArtifactsPage() {
+  const { rolesMap } = useRoles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -152,7 +153,7 @@ export default function ArtifactsPage() {
           ) : (
             <div className="p-6 space-y-8 max-w-3xl mx-auto">
               {Object.entries(tasksByArtifact).map(([artifactId, group]) => {
-                const role = ROLES[group.role_slug];
+                const role = rolesMap[group.role_slug];
                 return (
                   <div key={artifactId} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                     <div className={`px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2 ${role?.bgLight || 'bg-zinc-50 dark:bg-zinc-800'}`}>

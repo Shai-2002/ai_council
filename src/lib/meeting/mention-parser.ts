@@ -10,7 +10,8 @@ export interface ParsedMessage {
   rawText: string;
 }
 
-const ROLE_MAP: Record<string, string> = {
+// Default hardcoded maps (used as fallback)
+const DEFAULT_ROLE_MAP: Record<string, string> = {
   'aria': 'ceo',
   'ceo': 'ceo',
   'dev': 'coo',
@@ -25,7 +26,7 @@ const ROLE_MAP: Record<string, string> = {
   'everyone': 'all',
 };
 
-const ROLE_NAMES: Record<string, string> = {
+const DEFAULT_ROLE_NAMES: Record<string, string> = {
   'ceo': 'Aria',
   'coo': 'Dev',
   'cfo': 'Maya',
@@ -33,16 +34,44 @@ const ROLE_NAMES: Record<string, string> = {
   'marketing': 'Priya',
 };
 
-const ALL_ROLES = ['ceo', 'coo', 'cfo', 'product', 'marketing'];
+const DEFAULT_ALL_ROLES = ['ceo', 'coo', 'cfo', 'product', 'marketing'];
 
-export function parseMentions(text: string): ParsedMessage {
+/** Build a role map from dynamic roles array */
+export function buildRoleMap(roles: Array<{ slug: string; name: string; title: string }>): {
+  roleMap: Record<string, string>;
+  roleNames: Record<string, string>;
+  allRoles: string[];
+} {
+  const roleMap: Record<string, string> = { all: 'all', everyone: 'all' };
+  const roleNames: Record<string, string> = {};
+  const allRoles: string[] = [];
+
+  roles.forEach(r => {
+    roleMap[r.slug.toLowerCase()] = r.slug;
+    roleMap[r.name.toLowerCase()] = r.slug;
+    roleMap[r.title.toLowerCase()] = r.slug;
+    roleNames[r.slug] = r.name;
+    allRoles.push(r.slug);
+  });
+
+  return { roleMap, roleNames, allRoles };
+}
+
+export function parseMentions(
+  text: string,
+  dynamicMaps?: { roleMap: Record<string, string>; roleNames: Record<string, string>; allRoles: string[] }
+): ParsedMessage {
+  const roleMap = dynamicMaps?.roleMap || DEFAULT_ROLE_MAP;
+  const roleNames = dynamicMaps?.roleNames || DEFAULT_ROLE_NAMES;
+  const allRoles = dynamicMaps?.allRoles || DEFAULT_ALL_ROLES;
+
   const mentionRegex = /@(\w+)/gi;
   const matches: { role: string; index: number; length: number }[] = [];
 
   let match;
   while ((match = mentionRegex.exec(text)) !== null) {
     const roleName = match[1].toLowerCase();
-    const roleSlug = ROLE_MAP[roleName];
+    const roleSlug = roleMap[roleName];
     if (roleSlug) {
       matches.push({
         role: roleSlug,
@@ -57,7 +86,7 @@ export function parseMentions(text: string): ParsedMessage {
   }
 
   // Expand @all to all roles
-  const expandedRoles = matches.flatMap(m => m.role === 'all' ? ALL_ROLES : [m.role]);
+  const expandedRoles = matches.flatMap(m => m.role === 'all' ? allRoles : [m.role]);
   const uniqueRoles = [...new Set(expandedRoles)];
 
   // Extract per-role instructions
@@ -71,17 +100,17 @@ export function parseMentions(text: string): ParsedMessage {
     const instruction = text.slice(instructionStart, instructionEnd).trim();
 
     if (current.role === 'all') {
-      ALL_ROLES.forEach(r => {
+      allRoles.forEach(r => {
         mentions.push({
           roleSlug: r,
-          roleName: ROLE_NAMES[r],
+          roleName: roleNames[r] || r,
           instruction: instruction || text,
         });
       });
     } else {
       mentions.push({
         roleSlug: current.role,
-        roleName: ROLE_NAMES[current.role],
+        roleName: roleNames[current.role] || current.role,
         instruction: instruction || text,
       });
     }
@@ -95,9 +124,7 @@ export function parseMentions(text: string): ParsedMessage {
     }, {} as Record<string, ParsedMention>)
   );
 
-  // Simulation detection: 3+ unique roles + very specific simulation keywords
-  // Normal multi-role tagging (e.g. "@aria @dev @kai what do you think?") should NOT trigger this.
-  // Only explicit simulation requests should trigger the popup.
+  // Simulation detection
   const lowerText = text.toLowerCase();
   const simulationKeywords = [
     'simulate', 'simulation', 'run simulation',
@@ -117,21 +144,28 @@ export function parseMentions(text: string): ParsedMessage {
 }
 
 /** For autocomplete dropdown — returns matching roles for partial input */
-export function getMatchingRoles(partial: string): { slug: string; name: string; role: string }[] {
+export function getMatchingRoles(
+  partial: string,
+  dynamicMaps?: { roleMap: Record<string, string>; roleNames: Record<string, string>; allRoles: string[] }
+): { slug: string; name: string; role: string }[] {
+  const roleMap = dynamicMaps?.roleMap || DEFAULT_ROLE_MAP;
+  const roleNames = dynamicMaps?.roleNames || DEFAULT_ROLE_NAMES;
+  const allRoles = dynamicMaps?.allRoles || DEFAULT_ALL_ROLES;
+
   const lower = partial.toLowerCase().replace('@', '');
   if (!lower) {
-    return ALL_ROLES.map(slug => ({
+    return allRoles.map(slug => ({
       slug,
-      name: ROLE_NAMES[slug],
+      name: roleNames[slug] || slug,
       role: slug.toUpperCase(),
     }));
   }
 
-  return Object.entries(ROLE_MAP)
+  return Object.entries(roleMap)
     .filter(([key]) => key.startsWith(lower) && key !== 'all' && key !== 'everyone')
     .map(([, slug]) => ({
       slug,
-      name: ROLE_NAMES[slug],
+      name: roleNames[slug] || slug,
       role: slug.toUpperCase(),
     }))
     .filter((item, index, self) =>

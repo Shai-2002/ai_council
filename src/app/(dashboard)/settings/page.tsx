@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { useTheme } from "@/lib/hooks/useTheme";
 import { ROLE_TEMPLATES, COLOR_CLASSES, ROLE_COLORS } from "@/lib/role-templates";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ interface CustomRole {
 
 export default function SettingsPage() {
   const { workspaceId, profile } = useWorkspace();
+  const { refreshRoles } = useRoles();
   const { theme, setTheme } = useTheme();
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
@@ -80,6 +82,7 @@ export default function SettingsPage() {
       setNewRoleName('');
       setNewRoleTitle('');
       setSelectedTemplate('');
+      await refreshRoles();
     }
   };
 
@@ -94,12 +97,14 @@ export default function SettingsPage() {
       setRoles(prev => prev.map(r => r.id === updated.id ? updated : r));
     }
     setEditingRole(null);
+    await refreshRoles();
   };
 
   const deleteRole = async (roleId: string) => {
     if (!confirm('Deactivate this persona? Chat history will be preserved.')) return;
     await fetch(`/api/roles/${roleId}`, { method: 'DELETE' });
     setRoles(prev => prev.filter(r => r.id !== roleId));
+    await refreshRoles();
   };
 
   return (

@@ -5,7 +5,7 @@ import { useMeetingRoom } from "@/lib/hooks/useMeetingRoom";
 import { MentionInput } from "./MentionInput";
 import { RoleBubble } from "./RoleBubble";
 import { MessageBubble } from "@/components/chat/MessageBubble";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ interface MeetingRoomChatProps {
 }
 
 export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: MeetingRoomChatProps) {
+  const { roles, rolesMap } = useRoles();
   const {
     messages,
     activeRoles,
@@ -75,7 +76,7 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
       <div className="shrink-0 h-10 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/50 flex items-center px-4 gap-2">
         <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Present:</span>
         <div className="flex items-center -space-x-1 overflow-hidden pointer-events-none">
-          {Object.values(ROLES).map(role => {
+          {roles.map(role => {
             const hasSpoken = participantIds.includes(role.slug);
             return (
               <div 
@@ -105,7 +106,7 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
           {messages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 mb-4 flex items-center gap-2">
-                 {Object.values(ROLES).slice(0,3).map((r,i) => (
+                 {roles.slice(0,3).map((r,i) => (
                     <div key={i} className={`h-8 w-8 rounded-full ${r.bgDark} text-white flex items-center justify-center font-bold shadow-sm`}>{r.name[0]}</div>
                  ))}
                  <span className="text-indigo-600 dark:text-indigo-400 text-sm font-bold ml-1">+2</span>
@@ -127,7 +128,7 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
                 role: 'user' as const,
                 content: msg.content,
               };
-              const dummyRole = ROLES['ceo']; // only used for assistant styles
+              const dummyRole = rolesMap['ceo']; // only used for assistant styles
               return <MessageBubble key={msg.id} message={userMsgMock} role={dummyRole} />;
             } else {
               // Render RoleBubble

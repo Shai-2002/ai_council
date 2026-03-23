@@ -3,7 +3,7 @@
 import { Dispatch, SetStateAction } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { onFinalizeArtifact, onExportArtifact } from "@/lib/placeholder";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, FileText, Download, Printer } from "lucide-react";
@@ -20,11 +20,12 @@ export function ArtifactDetail({
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
 }) {
+  const { rolesMap } = useRoles();
   const artifact = artifactProp ?? null;
 
   if (!artifact || !artifactId) return null;
 
-  const role = ROLES[artifact.roleSlug];
+  const role = rolesMap[artifact.roleSlug];
   if (!role || !artifact.structuredData) return null;
 
   const structuredData = artifact.structuredData as {

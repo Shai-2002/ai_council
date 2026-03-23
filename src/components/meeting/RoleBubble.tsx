@@ -1,4 +1,6 @@
-import { ROLES } from "@/lib/roles-config";
+"use client";
+
+import { useRoles } from "@/lib/hooks/useRoles";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -11,7 +13,8 @@ interface RoleBubbleProps {
 }
 
 export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBubbleProps) {
-  const role = ROLES[roleSlug] || {
+  const { rolesMap } = useRoles();
+  const role = rolesMap[roleSlug] || {
     name: roleName || roleSlug,
     title: "AI",
     bgDark: "bg-zinc-600",

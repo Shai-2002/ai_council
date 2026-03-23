@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
-import { ROLES } from "@/lib/roles-config";
-import type { RoleSlug } from "@/types";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { MessageSquare, Plus, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,8 +21,9 @@ export default function RoleHistoryPage() {
   const router = useRouter();
   const { workspaceId } = useWorkspace();
 
+  const { getRoleBySlug } = useRoles();
   const roleStr = typeof roleSlug === 'string' ? roleSlug : Array.isArray(roleSlug) ? roleSlug[0] : '';
-  const role = ROLES[roleStr as RoleSlug];
+  const role = getRoleBySlug(roleStr);
 
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,7 @@ export default function RoleHistoryPage() {
     if (!workspaceId || !role) { setLoading(false); return; }
     async function load() {
       try {
-        const res = await fetch(`/api/chats?workspaceId=${workspaceId}&roleSlug=${role.slug}`);
+        const res = await fetch(`/api/chats?workspaceId=${workspaceId}&roleSlug=${role!.slug}`);
         if (res.ok) setChats(await res.json());
       } catch { /* ignore */ }
       setLoading(false);

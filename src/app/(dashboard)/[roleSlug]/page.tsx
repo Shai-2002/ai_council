@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { notFound, useParams } from "next/navigation";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { RoleHeader } from "@/components/roles/RoleHeader";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -10,33 +10,32 @@ import { useWorkspace } from "@/lib/hooks/useWorkspace";
 export default function RoleChatPage() {
   const params = useParams();
   const roleSlug = params.roleSlug as string;
-  const role = ROLES[roleSlug];
+  const { getRoleBySlug } = useRoles();
+  const role = getRoleBySlug(roleSlug);
   const { workspaceId, loading } = useWorkspace();
   const [chatId, setChatId] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(true);
 
   useEffect(() => {
     if (!workspaceId || !role) { setChatLoading(false); return; }
+    const r = role; // narrow for closure
 
     async function loadOrCreateChat() {
       try {
-        // Try to find the most recent chat for this role
-        const res = await fetch(`/api/chats?workspaceId=${workspaceId}&roleSlug=${role.slug}`);
+        const res = await fetch(`/api/chats?workspaceId=${workspaceId}&roleSlug=${r.slug}`);
         if (res.ok) {
           const chats = await res.json();
-          // Filter to non-project chats only
           const independentChats = chats.filter((c: { project_id: string | null }) => !c.project_id);
           if (independentChats.length > 0) {
             setChatId(independentChats[0].id);
           } else {
-            // Create a new chat for this role
             const createRes = await fetch('/api/chats', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 workspaceId,
-                title: `Chat with ${role.name} (${role.title})`,
-                roleSlug: role.slug,
+                title: `Chat with ${r.name} (${r.title})`,
+                roleSlug: r.slug,
                 chatType: 'single',
               }),
             });

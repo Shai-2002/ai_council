@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Layers, FileText, ChevronDown, ChevronRight, Folder, FolderInput, MessageSquare, Plus, Trash2, Users } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { onDeleteProject, onDeleteChat, onCreateChat } from "@/lib/placeholder";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -33,6 +33,7 @@ interface SidebarChat {
 }
 
 export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { roles, rolesMap } = useRoles();
   const pathname = usePathname();
   const router = useRouter();
   const { workspaceId } = useWorkspace();
@@ -150,7 +151,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex-1 px-4 overflow-y-auto space-y-6">
         <div className="space-y-1">
           <p className="px-2 text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">The Council</p>
-          {Object.values(ROLES).map((role) => {
+          {roles.map((role) => {
             const isActive = pathname === `/${role.slug}`;
 
             return (
@@ -285,7 +286,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 {isExpanded && (
                   <div className="pl-8 pr-2 space-y-0.5 pb-2">
                     {project.chats.map(chat => {
-                      const role = ROLES[chat.role_slug];
+                      const role = rolesMap[chat.role_slug];
                       const isChatActive = pathname === `/projects/${project.id}/chat/${chat.id}`;
                       return (
                         <Link
@@ -315,7 +316,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="space-y-1 mt-6">
           <p className="px-2 text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">Chat History</p>
 
-          {Object.values(ROLES).map(role => {
+          {roles.map(role => {
             const chats = chatHistory[role.slug];
             if (!chats || chats.length === 0) return null;
 

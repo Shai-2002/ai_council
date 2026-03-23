@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ChevronRight, ArrowLeft } from "lucide-react";
@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function ProjectChatPage() {
+  const { rolesMap } = useRoles();
   const { projectId, chatId } = useParams();
   const router = useRouter();
   const { workspaceId } = useWorkspace();
@@ -45,7 +46,7 @@ export default function ProjectChatPage() {
   if (loading) return <div className="flex-1 flex items-center justify-center h-full text-zinc-400">Loading...</div>;
   if (!chat) return <div className="p-8">Chat not found</div>;
 
-  const role = ROLES[chat.role_slug];
+  const role = rolesMap[chat.role_slug];
 
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden">

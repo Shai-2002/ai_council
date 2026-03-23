@@ -5,6 +5,7 @@ import { Menu } from "lucide-react";
 import { RoleSidebar } from "@/components/roles/RoleSidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { WorkspaceProvider } from "@/lib/hooks/useWorkspace";
+import { RolesProvider } from "@/lib/hooks/useRoles";
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
 
   return (
     <WorkspaceProvider>
+    <RolesProvider>
     <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-950">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col border-r border-zinc-200 dark:border-zinc-800">
@@ -47,6 +49,7 @@ export default function DashboardLayout({
         </div>
       </main>
     </div>
+    </RolesProvider>
     </WorkspaceProvider>
   );
 }

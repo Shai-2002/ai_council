@@ -1,5 +1,7 @@
+"use client";
+
 import { Artifact } from "@/types";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import * as LucideIcons from "lucide-react";
 
 function IconByName({ name, className }: { name: string; className?: string }) {
@@ -9,6 +11,7 @@ function IconByName({ name, className }: { name: string; className?: string }) {
 }
 
 export function ArtifactGrid({ artifacts, onSelect }: { artifacts: Artifact[], onSelect: (id: string) => void }) {
+  const { rolesMap } = useRoles();
   // Group by role_slug
   const grouped = artifacts.reduce((acc, artifact) => {
     if (!acc[artifact.roleSlug]) {
@@ -21,7 +24,7 @@ export function ArtifactGrid({ artifacts, onSelect }: { artifacts: Artifact[], o
   return (
     <div className="space-y-10 p-6">
       {Object.entries(grouped).map(([roleSlug, roleArtifacts]) => {
-        const role = ROLES[roleSlug];
+        const role = rolesMap[roleSlug];
         if (!role) return null;
 
         return (

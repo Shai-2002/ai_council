@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ROLES } from "@/lib/roles-config";
+import { useRoles } from "@/lib/hooks/useRoles";
 import { FileUploadButton, FileChips, type UploadedFile } from "@/components/chat/FileUpload";
 
 interface MentionInputProps {
@@ -13,6 +13,7 @@ interface MentionInputProps {
 }
 
 export function MentionInput({ onSend, placeholder = "Tag executives with @...", disabled }: MentionInputProps) {
+  const { roles } = useRoles();
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export function MentionInput({ onSend, placeholder = "Tag executives with @...",
 
   const rolesList = [
     { slug: "all", name: "Everyone", title: "Tag all executives", icon: "Users", bgDark: "bg-zinc-800" },
-    ...Object.values(ROLES),
+    ...roles,
   ];
 
   const filteredRoles = mentionQuery !== null
