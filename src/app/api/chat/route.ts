@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   // V6 transport sends: { trigger, chatId, messages, ...customBody }
-  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId, fileIds } = body;
+  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId } = body;
 
   // Validate role
   const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
@@ -127,25 +127,56 @@ export async function POST(req: Request) {
   }
 
   // ===== LAYER 5: File context =====
-  // Priority: explicitly attached fileIds > chat files > project files > role files
+  // Fetch ALL recent files for this context (chat > project > role > workspace)
+  // The user message includes "[Attached files: X, Y]" when files are uploaded
   let fileContext = '';
   if (workspaceId) {
+    // Try multiple scopes: chat-specific → project → role → workspace recent
     let allFiles: Array<{ name: string; extracted_text: string | null }> = [];
 
-    // First: fetch explicitly attached files (sent with this message)
-    if (Array.isArray(fileIds) && fileIds.length > 0) {
-      const { data: attachedFiles } = await supabase
+    // Scope 1: Files associated with this specific chat
+    if (chatId) {
+      const { data } = await supabase
         .from('files')
         .select('name, extracted_text')
-        .in('id', fileIds)
-        .eq('extraction_status', 'done');
-
-      if (attachedFiles) allFiles = attachedFiles;
+        .eq('chat_id', chatId)
+        .eq('extraction_status', 'done')
+        .not('extracted_text', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (data && data.length > 0) allFiles = data;
     }
 
-    // If no explicit files, fall back to associated files
+    // Scope 2: Files in same project
+    if (allFiles.length === 0 && resolvedProjectId) {
+      const { data } = await supabase
+        .from('files')
+        .select('name, extracted_text')
+        .eq('project_id', resolvedProjectId)
+        .eq('extraction_status', 'done')
+        .not('extracted_text', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (data && data.length > 0) allFiles = data;
+    }
+
+    // Scope 3: Files tagged with this role
+    if (allFiles.length === 0 && roleSlug) {
+      const { data } = await supabase
+        .from('files')
+        .select('name, extracted_text')
+        .eq('workspace_id', workspaceId)
+        .eq('role_slug', roleSlug)
+        .eq('extraction_status', 'done')
+        .not('extracted_text', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (data && data.length > 0) allFiles = data;
+    }
+
+    // Scope 4: Any recent workspace files
     if (allFiles.length === 0) {
-      let fileQuery = supabase
+      const { data } = await supabase
         .from('files')
         .select('name, extracted_text')
         .eq('workspace_id', workspaceId)
@@ -153,23 +184,13 @@ export async function POST(req: Request) {
         .not('extracted_text', 'is', null)
         .order('created_at', { ascending: false })
         .limit(3);
-
-      if (chatId) {
-        fileQuery = fileQuery.eq('chat_id', chatId);
-      } else if (resolvedProjectId) {
-        fileQuery = fileQuery.eq('project_id', resolvedProjectId);
-      } else if (roleSlug) {
-        fileQuery = fileQuery.eq('role_slug', roleSlug);
-      }
-
-      const { data: contextFiles } = await fileQuery;
-      if (contextFiles) allFiles = contextFiles;
+      if (data && data.length > 0) allFiles = data;
     }
 
     if (allFiles.length > 0) {
-      fileContext = '\n\nATTACHED/UPLOADED DOCUMENTS:\n';
+      fileContext = '\n\nUPLOADED DOCUMENTS (the user has uploaded these — reference them when relevant):\n';
       allFiles.forEach((f) => {
-        const text = f.extracted_text?.substring(0, 1500) || '';
+        const text = f.extracted_text?.substring(0, 2000) || '';
         if (text) {
           fileContext += `--- ${f.name} ---\n${text}\n---\n\n`;
         }

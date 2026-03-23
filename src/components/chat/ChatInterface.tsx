@@ -17,14 +17,11 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
 }
 
 export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string }) {
-  const [fileIds, setFileIds] = useState<string[]>([]);
-
   const { messages, sendMessage, status } = useRoleChat({
     roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,
     chatId: chatId ?? null,
     projectId: projectId ?? null,
-    fileIds,
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -54,7 +51,6 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
   }, []);
 
   const handleFilesUploaded = (newFiles: UploadedFile[]) => {
-    // Merge: replace existing by name, add new ones
     setFiles(prev => {
       const map = new Map(prev.map(f => [f.name, f]));
       newFiles.forEach(f => map.set(f.name, f));
@@ -74,15 +70,15 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     if (!trimmedInput && !hasFiles) return;
     if (isLoading) return;
 
-    // Build the message text
-    const text = trimmedInput ||
-      `Please review the attached file${doneFiles.length > 1 ? 's' : ''}: ${doneFiles.map(f => f.name).join(', ')}`;
+    // Build the message — include file names so the API can find them
+    let text = trimmedInput;
+    if (hasFiles) {
+      const fileNote = `[Attached files: ${doneFiles.map(f => f.name).join(', ')}]`;
+      text = trimmedInput
+        ? `${trimmedInput}\n\n${fileNote}`
+        : `Please review the attached file${doneFiles.length > 1 ? 's' : ''}: ${doneFiles.map(f => f.name).join(', ')}`;
+    }
 
-    // Set file IDs for the transport body before sending
-    const ids = doneFiles.map(f => f.id).filter(Boolean);
-    setFileIds(ids);
-
-    // Clear input and files
     setInput("");
     setFiles([]);
 
@@ -91,9 +87,6 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
     } catch (err) {
       console.error('Send failed:', err);
     }
-
-    // Clear file IDs after send
-    setFileIds([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -162,10 +155,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: 
 
       {/* Input area — pinned to bottom */}
       <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        {/* File chips — ABOVE the input row */}
         <FileChips files={files} onRemove={removeFile} />
-
-        {/* Input row */}
         <div className="px-4 sm:px-6 py-3">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 relative">
