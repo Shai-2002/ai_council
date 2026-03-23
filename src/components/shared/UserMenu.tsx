@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { onLogout } from "@/lib/placeholder";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 
 export function UserMenu() {
   const { profile, loading } = useWorkspace();

@@ -227,7 +227,8 @@ export default function SettingsPage() {
         )}
 
         {/* Create Persona Dialog */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        {showCreateDialog && (
+        <Dialog open onOpenChange={() => setShowCreateDialog(false)}>
           <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogTitle>Add New Persona</DialogTitle>
             <div className="space-y-4 mt-2">
@@ -284,10 +285,11 @@ export default function SettingsPage() {
             </div>
           </DialogContent>
         </Dialog>
+        )}
 
         {/* Edit Persona Dialog */}
         {editingRole && (
-          <Dialog open={!!editingRole} onOpenChange={() => setEditingRole(null)}>
+          <Dialog open onOpenChange={() => setEditingRole(null)}>
             <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
               <DialogTitle>Edit {editingRole.name}</DialogTitle>
               <EditRoleForm
