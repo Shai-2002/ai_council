@@ -16,12 +16,13 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
     .join('') || '';
 }
 
-export function ChatInterface({ role, workspaceId, chatId, projectId }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string }) {
+export function ChatInterface({ role, workspaceId, chatId, projectId, initialMessages }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string; initialMessages?: Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }> }) {
   const { messages, sendMessage, status } = useRoleChat({
     roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,
     chatId: chatId ?? null,
     projectId: projectId ?? null,
+    initialMessages,
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);

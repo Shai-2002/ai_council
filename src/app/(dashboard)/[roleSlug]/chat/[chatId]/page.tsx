@@ -20,6 +20,7 @@ export default function RoleIndependentChatPage() {
   const role = ROLES[roleStr as RoleSlug];
 
   const [chat, setChat] = useState<{ id: string; title: string; updated_at: string } | null>(null);
+  const [initialMessages, setInitialMessages] = useState<Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,6 +31,13 @@ export default function RoleIndependentChatPage() {
         if (res.ok) {
           const data = await res.json();
           setChat({ id: data.id, title: data.title, updated_at: data.updated_at });
+          if (data.messages && data.messages.length > 0) {
+            setInitialMessages(data.messages.map((m: { id: string; sender: string; content: string }) => ({
+              id: m.id,
+              role: m.sender,
+              parts: [{ type: 'text', text: m.content }],
+            })));
+          }
         }
       } catch { /* ignore */ }
       setLoading(false);
@@ -73,7 +81,7 @@ export default function RoleIndependentChatPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ChatInterface role={role} workspaceId={workspaceId} chatId={chatIdStr} />
+        <ChatInterface role={role} workspaceId={workspaceId} chatId={chatIdStr} initialMessages={initialMessages} />
       </div>
     </div>
   );

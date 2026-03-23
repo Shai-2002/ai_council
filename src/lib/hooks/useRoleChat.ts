@@ -9,14 +9,17 @@ export function useRoleChat({
   workspaceId,
   chatId,
   projectId,
+  initialMessages,
 }: {
   roleSlug: RoleSlug;
   workspaceId: string | null;
   chatId?: string | null;
   projectId?: string | null;
+  initialMessages?: Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }>;
 }) {
   const chatHelpers = useChat({
     id: chatId || undefined,
+    messages: initialMessages as Parameters<typeof useChat>[0]['messages'],
     transport: new DefaultChatTransport({
       api: '/api/chat',
       body: {
