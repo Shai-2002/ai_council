@@ -1,8 +1,9 @@
 import { streamText, type UIMessage } from 'ai';
+import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { roleModel } from '@/lib/ai/provider';
-import { ROLE_CONFIGS } from '@/lib/ai/roles';
+import { ROLE_CONFIGS, type RoleConfig } from '@/lib/ai/roles';
 import type { RoleSlug } from '@/types';
 
 export async function POST(req: Request) {
@@ -11,11 +12,8 @@ export async function POST(req: Request) {
   // V6 transport sends: { trigger, chatId, messages, ...customBody }
   const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId } = body;
 
-  // Validate role
-  const roleConfig = ROLE_CONFIGS[roleSlug as RoleSlug];
-  if (!roleConfig) {
-    return new Response('Invalid role', { status: 400 });
-  }
+  // We'll resolve roleConfig after creating the supabase client (need it for custom role lookup)
+  let roleConfig: RoleConfig | null = ROLE_CONFIGS[roleSlug as RoleSlug] || null;
 
   // Create server supabase client
   const cookieStore = await cookies();
@@ -44,6 +42,44 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return new Response('Unauthorized', { status: 401 });
+  }
+
+  // Check for custom role override from database
+  if (workspaceId) {
+    const { data: customRole } = await supabase
+      .from('custom_roles')
+      .select('personality, name, title, description, challenge_rules, artifact_type')
+      .eq('workspace_id', workspaceId)
+      .eq('slug', roleSlug)
+      .eq('is_active', true)
+      .single();
+
+    if (customRole && customRole.personality) {
+      if (roleConfig) {
+        // Override built-in role with custom personality
+        roleConfig = {
+          ...roleConfig,
+          systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
+          name: customRole.name,
+          title: customRole.title,
+          artifactType: customRole.artifact_type || roleConfig.artifactType,
+        };
+      } else {
+        // Fully custom role (not one of the 5 defaults)
+        roleConfig = {
+          slug: roleSlug as RoleSlug,
+          name: customRole.name,
+          title: customRole.title,
+          systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
+          outputSchema: z.any(),
+          artifactType: customRole.artifact_type || 'Analysis',
+        };
+      }
+    }
+  }
+
+  if (!roleConfig) {
+    return new Response('Invalid role', { status: 400 });
   }
 
   // Convert UIMessage[] to the format streamText expects
