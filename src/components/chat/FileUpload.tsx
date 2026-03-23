@@ -155,11 +155,8 @@ export function FileUpload({
   context?: { projectId?: string; chatId?: string; roleSlug?: string };
   resetSignal?: number;
 }) {
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-
   useEffect(() => {
     if (resetSignal > 0) {
-      setFiles([]);
       onFilesChange([]);
     }
   }, [resetSignal, onFilesChange]);
@@ -169,7 +166,6 @@ export function FileUpload({
       workspaceId={workspaceId}
       context={context}
       onFilesUploaded={(newFiles) => {
-        setFiles(newFiles);
         onFilesChange(newFiles);
       }}
     />

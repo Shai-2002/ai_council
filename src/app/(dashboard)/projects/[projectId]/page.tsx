@@ -9,6 +9,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilePool } from "@/components/files/FilePool";
+import { MeetingRoomChat } from "@/components/meeting/MeetingRoomChat";
 import { onCreateChat } from "@/lib/placeholder";
 import {
   DropdownMenu,
@@ -164,6 +165,9 @@ export default function ProjectDetail() {
             <TabsTrigger value="files" className="rounded-lg px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm text-sm">
               <FileText className="h-4 w-4 mr-2" /> Files
             </TabsTrigger>
+            <TabsTrigger value="meeting-room" className="rounded-lg px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm text-sm">
+              <MessageSquare className="h-4 w-4 mr-2" /> Meeting Room
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="chats" className="outline-none">
@@ -211,6 +215,10 @@ export default function ProjectDetail() {
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Files here are accessible by all roles working on this project.</p>
             </div>
             <FilePool context={{ projectId: project.id }} />
+          </TabsContent>
+
+          <TabsContent value="meeting-room" className="outline-none h-[600px] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden mt-4 bg-white dark:bg-zinc-950">
+            <MeetingRoomChat chatId={`project-meeting-${project.id}`} workspaceId="default" projectId={project.id} />
           </TabsContent>
         </Tabs>
       </div>

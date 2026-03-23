@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layers, FileText, ChevronDown, ChevronRight, Folder, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Layers, FileText, ChevronDown, ChevronRight, Folder, MessageSquare, Plus, Trash2, Users } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { ROLES } from "@/lib/roles-config";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
@@ -38,10 +38,12 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
   const [expandedHistory, setExpandedHistory] = useState<string[]>([]);
+  const [isMeetingRoomExpanded, setIsMeetingRoomExpanded] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
 
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [chatHistory, setChatHistory] = useState<Record<string, SidebarChat[]>>({});
+  const [meetingRooms, setMeetingRooms] = useState<SidebarChat[]>([]);
 
   const loadData = useCallback(async () => {
     if (!workspaceId) return;
@@ -69,13 +71,19 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
       if (chatsRes.ok) {
         const allChats = await chatsRes.json();
         const grouped: Record<string, SidebarChat[]> = {};
+        const meetings: SidebarChat[] = [];
         for (const chat of allChats) {
-          if (chat.role_slug && !chat.project_id) {
-            if (!grouped[chat.role_slug]) grouped[chat.role_slug] = [];
-            grouped[chat.role_slug].push({ id: chat.id, title: chat.title, updated_at: chat.updated_at });
+          if (!chat.project_id) {
+            if (chat.role_slug) {
+              if (!grouped[chat.role_slug]) grouped[chat.role_slug] = [];
+              grouped[chat.role_slug].push({ id: chat.id, title: chat.title, updated_at: chat.updated_at });
+            } else if (chat.role_slug === 'meeting_room' || !chat.role_slug) {
+              meetings.push({ id: chat.id, title: chat.title || 'Meeting Room', updated_at: chat.updated_at });
+            }
           }
         }
         setChatHistory(grouped);
+        setMeetingRooms(meetings);
       }
     } catch { /* ignore */ }
   }, [workspaceId]);
@@ -98,6 +106,15 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
     const chat = await onCreateChat({ title: "New chat", roleSlug });
     loadData();
     router.push(`/${roleSlug}/chat/${chat.id}`);
+    if (onNavigate) onNavigate();
+  };
+
+  const handleCreateMeetingRoom = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const chat = await onCreateChat({ title: "New Meeting Room" });
+    loadData();
+    router.push(`/meeting-room/${chat.id}`);
     if (onNavigate) onNavigate();
   };
 
@@ -165,6 +182,59 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </Link>
             );
           })}
+        </div>
+
+        {/* MEETING ROOM */}
+        <div className="space-y-1 mt-6">
+          <div className="flex items-center justify-between px-2 mb-2 group cursor-pointer" onClick={() => setIsMeetingRoomExpanded(!isMeetingRoomExpanded)}>
+            <div className="flex items-center gap-2">
+              {isMeetingRoomExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />}
+              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                Meeting Room
+              </span>
+            </div>
+            <button
+              onClick={handleCreateMeetingRoom}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all cursor-pointer"
+              title="New meeting room"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {isMeetingRoomExpanded && (
+            <div className="pl-6 pr-2 space-y-0.5 pb-2">
+              {meetingRooms.length === 0 && (
+                <p className="px-2 text-xs text-zinc-400 dark:text-zinc-500">No rooms yet</p>
+              )}
+              {meetingRooms.map(room => {
+                const isRoomActive = pathname === `/meeting-room/${room.id}`;
+                return (
+                  <div key={room.id} className="flex items-center justify-between group">
+                    <Link
+                      href={`/meeting-room/${room.id}`}
+                      onClick={handleNavClick}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors truncate flex-1 ${
+                        isRoomActive
+                          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
+                      }`}
+                    >
+                      <Users className="h-3 w-3 shrink-0 opacity-70" />
+                      <span className="truncate">{room.title}</span>
+                    </Link>
+                    <button
+                      title="Delete room"
+                      onClick={(e) => handleDeleteChat(room.id, e)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity px-1 shrink-0"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* PROJECTS */}
