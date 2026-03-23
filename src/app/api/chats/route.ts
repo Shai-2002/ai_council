@@ -69,5 +69,15 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // If meeting_room, auto-add all 5 roles as participants
+  if ((chatType || 'single') === 'meeting_room' && data) {
+    const participants = ['ceo', 'coo', 'cfo', 'product', 'marketing'].map(role => ({
+      chat_id: data.id,
+      role_slug: role,
+    }));
+    await supabase.from('meeting_participants').insert(participants);
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
