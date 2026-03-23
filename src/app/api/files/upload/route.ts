@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedClient } from '@/lib/supabase/auth-helpers';
+import { extractText } from '@/lib/file-processing';
 
 export async function POST(req: Request) {
   const { supabase, user } = await getAuthenticatedClient();
@@ -42,8 +43,7 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Insert file record with 'pending' status
-    // The Supabase Edge Function webhook will handle text extraction async
+    // Insert file record with 'processing' status
     const { data: fileRecord, error: insertError } = await supabase
       .from('files')
       .insert({
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         file_type: file.type,
         size_bytes: file.size,
         storage_path: storagePath,
-        extraction_status: 'pending',
+        extraction_status: 'processing',
         source: 'upload',
       })
       .select()
@@ -66,6 +66,25 @@ export async function POST(req: Request) {
       continue;
     }
 
+    // Extract text inline using Claude (for PDF) or mammoth (for DOCX)
+    // This runs before returning, ensuring text is available for the next chat message
+    let extractedText = '';
+    try {
+      extractedText = await extractText(buffer, file.type);
+    } catch (err) {
+      console.error('Extraction failed:', err);
+    }
+
+    const extractionStatus = extractedText && extractedText.length > 50 ? 'done' : 'failed';
+
+    await supabase
+      .from('files')
+      .update({
+        extracted_text: extractedText || null,
+        extraction_status: extractionStatus,
+      })
+      .eq('id', fileRecord.id);
+
     // Get signed URL
     const { data: urlData } = await supabase.storage
       .from('workspace-files')
@@ -73,6 +92,8 @@ export async function POST(req: Request) {
 
     results.push({
       ...fileRecord,
+      extracted_text: extractedText || null,
+      extraction_status: extractionStatus,
       download_url: urlData?.signedUrl || null,
     });
   }
