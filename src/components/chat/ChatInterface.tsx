@@ -16,7 +16,8 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
     .join('') || '';
 }
 
-export function ChatInterface({ role, workspaceId, chatId, projectId, initialMessages }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string; initialMessages?: Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }> }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function ChatInterface({ role, workspaceId, chatId, projectId, initialMessages }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string; initialMessages?: any[] }) {
   const { messages, sendMessage, status } = useRoleChat({
     roleSlug: role.slug as RoleSlug,
     workspaceId: workspaceId ?? null,

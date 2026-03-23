@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { RoleSlug } from '@/types';
 
 export function useRoleChat({
@@ -15,11 +15,11 @@ export function useRoleChat({
   workspaceId: string | null;
   chatId?: string | null;
   projectId?: string | null;
-  initialMessages?: Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }>;
+  initialMessages?: UIMessage[];
 }) {
   const chatHelpers = useChat({
     id: chatId || undefined,
-    messages: initialMessages as Parameters<typeof useChat>[0]['messages'],
+    messages: initialMessages,
     transport: new DefaultChatTransport({
       api: '/api/chat',
       body: {
