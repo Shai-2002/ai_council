@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import { LogOut, Settings, User } from "lucide-react";
 
 export function UserMenu() {
   const { profile, loading } = useWorkspace();
+  const router = useRouter();
 
   const displayName = profile?.full_name || "User";
   const initials = displayName ? displayName.charAt(0).toUpperCase() : "U";
@@ -39,17 +41,10 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer"
-          onClick={() => { /* Profile page coming in a future wave */ }}
+          onClick={() => router.push('/settings')}
         >
           <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => { /* Settings page coming in a future wave */ }}
-        >
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
+          <span>Profile & Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onLogout()} className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400">
