@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layers, FileText, ChevronDown, ChevronRight, Folder, MessageSquare, Plus, Trash2, Users } from "lucide-react";
+import { Layers, FileText, ChevronDown, ChevronRight, Folder, FolderInput, MessageSquare, Plus, Trash2, Users } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { ROLES } from "@/lib/roles-config";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { onDeleteProject, onDeleteChat, onCreateChat } from "@/lib/placeholder";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { UserMenu } from "@/components/shared/UserMenu";
+import { MoveToProjectDialog } from "@/components/shared/MoveToProjectDialog";
 import { Separator } from "@/components/ui/separator";
 
 function IconByName({ name, className }: { name: string; className?: string }) {
@@ -44,6 +45,7 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [chatHistory, setChatHistory] = useState<Record<string, SidebarChat[]>>({});
   const [meetingRooms, setMeetingRooms] = useState<SidebarChat[]>([]);
+  const [moveChatId, setMoveChatId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!workspaceId) return;
@@ -349,6 +351,13 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                             <span className="truncate">{chat.title}</span>
                           </Link>
                           <button
+                            title="Move to project"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMoveChatId(chat.id); }}
+                            className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-indigo-500 transition-opacity px-1 shrink-0"
+                          >
+                            <FolderInput className="h-3 w-3" />
+                          </button>
+                          <button
                             title="Delete chat"
                             onClick={(e) => handleDeleteChat(chat.id, e)}
                             className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity px-1 shrink-0"
@@ -411,6 +420,15 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
           if (!open) loadData();
         }}
       />
+
+      {moveChatId && (
+        <MoveToProjectDialog
+          chatId={moveChatId}
+          open={!!moveChatId}
+          onOpenChange={(open) => { if (!open) setMoveChatId(null); }}
+          onMoved={() => { setMoveChatId(null); loadData(); }}
+        />
+      )}
     </div>
   );
 }
