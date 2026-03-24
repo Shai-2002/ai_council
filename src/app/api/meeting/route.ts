@@ -208,8 +208,24 @@ export async function POST(req: Request) {
             : '',
           conversationContext ? `\nMEETING CONVERSATION SO FAR:\n${conversationContext}` : '',
           artifactContext ? `\nRECENT DECISIONS:\n${artifactContext}` : '',
-          fileContext,
-          `\nKeep your response focused. Other executives may respond after you. Do not repeat what others have already said.
+          fileContext ? `\nUPLOADED DOCUMENTS ARE AVAILABLE (listed below). However:
+- ONLY reference these documents if the user's message asks about them, mentions them, or is clearly related to their content
+- If the user just says "hi" or asks a general question, DO NOT analyze the documents unprompted
+- Wait for the user to ask about the files before diving into analysis
+- If you DO reference a file, cite it by name
+${fileContext}` : '',
+          `\nCRITICAL MEETING ROOM RULES:
+Other executives have already spoken or will speak after you. DO NOT:
+- Repeat analysis that another executive already covered
+- Summarize the uploaded documents again if someone else already did
+- List the same data points another executive already cited
+- Use the same response structure as the person before you
+
+INSTEAD:
+- Reference what they said: "Building on what [Name] flagged about X..."
+- Add YOUR unique lens that nobody else provides
+- If you agree with another executive, say so in ONE sentence and move to YOUR new insight
+- Keep your response to 300 words max when others have already covered the basics
 
 When you see another executive's point that you disagree with, you MUST:
 1. Name the executive and their specific claim

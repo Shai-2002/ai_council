@@ -242,7 +242,7 @@ export async function POST(req: Request) {
     });
 
     if (uniqueFiles.length > 0) {
-      fileContext = '\n\nUPLOADED DOCUMENTS (the user has uploaded these — reference them when relevant):\n';
+      fileContext = '\n\nUPLOADED DOCUMENTS ARE AVAILABLE (listed below). However:\n- ONLY reference these documents if the user asks about them or their message is clearly related\n- If the user asks a general question, do NOT analyze the documents unprompted\n- If you DO reference a file, cite it by name\n\n';
       uniqueFiles.forEach((f) => {
         const text = f.extracted_text?.substring(0, 1500) || '';
         if (text) {
