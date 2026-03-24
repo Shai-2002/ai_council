@@ -11,20 +11,7 @@ export interface Commitment {
   createdAt: string;
 }
 
-const MOCK_RULES: Commitment[] = [
-  {
-    id: "1", command: "Never summarize confidential documents", type: "constraint",
-    scope: "workspace", createdAt: "2026-03-24T10:00:00Z"
-  },
-  {
-    id: "2", command: "Always respond in bullet points for finance", type: "policy",
-    scope: { projectId: "proj_1" }, createdAt: "2026-03-24T11:00:00Z"
-  },
-  {
-    id: "3", command: "When I say 'launch', I mean deploy to staging", type: "definition",
-    scope: "workspace", createdAt: "2026-03-23T09:00:00Z"
-  }
-];
+// No mock data — fetches from real API
 
 export function CommitmentsPanel({ workspaceId }: { workspaceId?: string | null }) {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -36,18 +23,17 @@ export function CommitmentsPanel({ workspaceId }: { workspaceId?: string | null 
       return;
     }
     
-    // Attempt actual fetch, fallback to mock data
     async function load() {
       try {
         const res = await fetch(`/api/commitments?workspaceId=${workspaceId}`);
         if (res.ok) {
           const data = await res.json();
-          setCommitments(data && data.length > 0 ? data : MOCK_RULES);
+          setCommitments(Array.isArray(data) ? data : []);
         } else {
-          setCommitments(MOCK_RULES);
+          setCommitments([]);
         }
       } catch {
-        setCommitments(MOCK_RULES);
+        setCommitments([]);
       } finally {
         setLoading(false);
       }
