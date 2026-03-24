@@ -73,7 +73,27 @@ export async function runSimulation(job: SimulationJob): Promise<void> {
 
   // Run each role sequentially
   for (const roleSlug of tagged_roles) {
-    const config = ROLE_CONFIGS[roleSlug];
+    let config = ROLE_CONFIGS[roleSlug];
+
+    // Check for custom roles in DB if not found in defaults
+    if (!config) {
+      const { data: customRole } = await supabase
+        .from('custom_roles')
+        .select('name, title, personality, description, challenge_rules')
+        .eq('workspace_id', workspace_id)
+        .eq('slug', roleSlug)
+        .eq('is_active', true)
+        .single();
+
+      if (customRole) {
+        config = {
+          name: customRole.name,
+          personality: customRole.personality || `You are ${customRole.name}, the ${customRole.title}. ${customRole.description}`,
+          challengeRules: customRole.challenge_rules || '',
+        };
+      }
+    }
+
     if (!config) continue;
 
     // Build simulation-specific prompt
