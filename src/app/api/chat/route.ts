@@ -240,8 +240,33 @@ export async function POST(req: Request) {
     }
   }
 
-  // ===== ASSEMBLE SYSTEM PROMPT (6 layers) =====
-  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}`;
+  // ===== LAYER 7: Active commitments =====
+  let commitmentsContext = '';
+  if (workspaceId) {
+    let commitmentQuery = supabase
+      .from('commitments')
+      .select('type, content')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true);
+
+    if (resolvedProjectId) {
+      commitmentQuery = commitmentQuery.or(`scope.eq.workspace,project_id.eq.${resolvedProjectId}`);
+    } else {
+      commitmentQuery = commitmentQuery.eq('scope', 'workspace');
+    }
+
+    const { data: commitments } = await commitmentQuery.limit(15);
+    if (commitments && commitments.length > 0) {
+      commitmentsContext = '\n\n=== ACTIVE COMMITMENTS (You MUST obey these) ===\n';
+      commitments.forEach(c => {
+        commitmentsContext += `[${c.type.toUpperCase()}] ${c.content}\n`;
+      });
+      commitmentsContext += '===';
+    }
+  }
+
+  // ===== ASSEMBLE SYSTEM PROMPT (7 layers) =====
+  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}${commitmentsContext}`;
 
   // ===== RESOLVE MODEL =====
   const { model, modelSlug } = resolveModel({
