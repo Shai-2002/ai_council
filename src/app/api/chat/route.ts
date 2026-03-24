@@ -142,9 +142,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // ===== LAYER 4: Project cross-chat context =====
+  // ===== LAYER 4: Project cross-chat context + folder memory =====
   let projectContext = '';
   const resolvedProjectId = projectId || null;
+
+  // Inject folder memory if available
+  if (resolvedProjectId) {
+    const { data: project } = await supabase
+      .from('projects')
+      .select('memory_summary')
+      .eq('id', resolvedProjectId)
+      .single();
+    if (project?.memory_summary) {
+      projectContext = `\n\nPROJECT MEMORY (key decisions and context from previous conversations):\n${project.memory_summary}`;
+    }
+  }
   if (resolvedProjectId && chatId) {
     // First get chat IDs within this project (excluding current chat)
     const { data: projectChatIds } = await supabase
