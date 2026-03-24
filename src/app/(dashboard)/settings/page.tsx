@@ -331,7 +331,7 @@ function EditRoleForm({ role, models, onSave, onCancel }: { role: CustomRole; mo
   const [description, setDescription] = useState(role.description);
   const [personality, setPersonality] = useState(role.personality);
   const [color, setColor] = useState(role.color);
-  const [defaultModel, setDefaultModel] = useState(role.default_model || 'anthropic/claude-sonnet-4-6');
+  const [defaultModel, setDefaultModel] = useState(role.default_model || 'anthropic/claude-sonnet-4.6');
 
   // Group models by provider
   const modelsByProvider = models.reduce((acc, m) => {

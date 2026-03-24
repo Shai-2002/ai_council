@@ -14,9 +14,9 @@ CREATE TABLE IF NOT EXISTS models (
 
 -- Seed available models
 INSERT INTO models (slug, display_name, provider, category, supports_vision, cost_tier) VALUES
-  ('anthropic/claude-sonnet-4-6', 'Claude Sonnet 4', 'Anthropic', 'reasoning', false, 'standard'),
-  ('anthropic/claude-opus-4-6', 'Claude Opus 4', 'Anthropic', 'reasoning', false, 'premium'),
-  ('anthropic/claude-haiku-4-5-20251001', 'Claude Haiku 4', 'Anthropic', 'fast', false, 'cheap'),
+  ('anthropic/claude-sonnet-4.6', 'Claude Sonnet 4', 'Anthropic', 'reasoning', false, 'standard'),
+  ('anthropic/claude-opus-4.6', 'Claude Opus 4', 'Anthropic', 'reasoning', false, 'premium'),
+  ('anthropic/claude-haiku-4.5', 'Claude Haiku 4', 'Anthropic', 'fast', false, 'cheap'),
   ('x-ai/grok-3', 'Grok 3', 'xAI', 'reasoning', false, 'standard'),
   ('x-ai/grok-3-mini', 'Grok 3 Mini', 'xAI', 'fast', false, 'cheap'),
   ('openai/gpt-4o', 'GPT-4o', 'OpenAI', 'reasoning', true, 'standard'),
@@ -32,7 +32,7 @@ INSERT INTO models (slug, display_name, provider, category, supports_vision, cos
 ON CONFLICT (slug) DO NOTHING;
 
 -- Add default_model to custom_roles
-ALTER TABLE custom_roles ADD COLUMN IF NOT EXISTS default_model TEXT DEFAULT 'anthropic/claude-sonnet-4-6';
+ALTER TABLE custom_roles ADD COLUMN IF NOT EXISTS default_model TEXT DEFAULT 'anthropic/claude-sonnet-4.6';
 
 -- Add model_used to messages for tracking
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS model_used TEXT;

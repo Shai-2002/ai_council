@@ -1,6 +1,6 @@
 import { openrouter } from './provider';
 
-const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-6';
+const DEFAULT_MODEL = 'anthropic/claude-sonnet-4.6';
 
 /**
  * Resolve which model to use for a request.
@@ -20,12 +20,9 @@ export function resolveModel(options: {
 /** Get display name for a model slug (for UI attribution) */
 export function getModelDisplayName(slug: string): string {
   const names: Record<string, string> = {
-    'anthropic/claude-sonnet-4-6': 'Claude Sonnet 4',
-    'anthropic/claude-sonnet-4-20250514': 'Claude Sonnet 4',
-    'anthropic/claude-opus-4-6': 'Claude Opus 4',
-    'anthropic/claude-opus-4-20250514': 'Claude Opus 4',
-    'anthropic/claude-haiku-4-5-20251001': 'Claude Haiku 4',
-    'anthropic/claude-haiku-4-20250414': 'Claude Haiku 4',
+    'anthropic/claude-sonnet-4.6': 'Claude Sonnet 4',
+    'anthropic/claude-opus-4.6': 'Claude Opus 4',
+    'anthropic/claude-haiku-4.5': 'Claude Haiku 4',
     'x-ai/grok-3': 'Grok 3',
     'x-ai/grok-3-mini': 'Grok 3 Mini',
     'openai/gpt-4o': 'GPT-4o',

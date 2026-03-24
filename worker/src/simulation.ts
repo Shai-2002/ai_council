@@ -99,7 +99,7 @@ export async function runSimulation(job: SimulationJob): Promise<void> {
     try {
       const result = await generateText({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        model: openrouter('anthropic/claude-sonnet-4-6') as any,
+        model: openrouter('anthropic/claude-sonnet-4.6') as any,
         system: systemPrompt,
         messages: [{ role: 'user' as const, content: trigger_message }],
         maxOutputTokens: 2000,

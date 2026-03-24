@@ -54,7 +54,7 @@ async function extractWithClaude(buffer: Buffer, mediaType: string): Promise<str
     const base64 = buffer.toString('base64');
 
     const result = await generateText({
-      model: openrouter('anthropic/claude-sonnet-4-6'),
+      model: openrouter('anthropic/claude-sonnet-4.6'),
       messages: [
         {
           role: 'user',
