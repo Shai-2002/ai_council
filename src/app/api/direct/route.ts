@@ -4,10 +4,10 @@ import { resolveModel, getModelDisplayName } from '@/lib/ai/router';
 
 /** Model aliases for @mention routing in direct mode */
 const MODEL_ALIASES: Record<string, string> = {
-  claude: 'anthropic/claude-sonnet-4-20250514',
-  anthropic: 'anthropic/claude-sonnet-4-20250514',
-  'claude-opus': 'anthropic/claude-opus-4-20250514',
-  'claude-haiku': 'anthropic/claude-haiku-4-20250414',
+  claude: 'anthropic/claude-sonnet-4-6',
+  anthropic: 'anthropic/claude-sonnet-4-6',
+  'claude-opus': 'anthropic/claude-opus-4-6',
+  'claude-haiku': 'anthropic/claude-haiku-4-5-20251001',
   grok: 'x-ai/grok-3',
   xai: 'x-ai/grok-3',
   gpt: 'openai/gpt-4o',
