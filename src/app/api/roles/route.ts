@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedClient } from '@/lib/supabase/auth-helpers';
 import { ROLE_CONFIGS } from '@/lib/ai/roles';
+import { ROLES } from '@/lib/roles-config';
 import { ROLE_TEMPLATES } from '@/lib/role-templates';
 import type { RoleSlug } from '@/types';
 
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
         slug,
         name: config.name,
         title: config.title,
-        description: config.systemPrompt.substring(0, 80) + '...',
+        description: ROLES[slug]?.description || config.title,
         personality: config.systemPrompt,
         challenge_rules: '',
         color: slug === 'ceo' ? 'indigo' : slug === 'coo' ? 'emerald' : slug === 'cfo' ? 'amber' : slug === 'product' ? 'violet' : 'rose',
