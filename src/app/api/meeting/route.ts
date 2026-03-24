@@ -1,8 +1,9 @@
 import { streamText } from 'ai';
+import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { roleModel } from '@/lib/ai/provider';
-import { ROLE_CONFIGS } from '@/lib/ai/roles';
+import { resolveModel } from '@/lib/ai/router';
+import { ROLE_CONFIGS, type RoleConfig } from '@/lib/ai/roles';
 import { parseMentions } from '@/lib/meeting/mention-parser';
 import type { RoleSlug } from '@/types';
 
@@ -163,14 +164,39 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       for (const mention of parsed.mentions) {
-        const roleConfig = ROLE_CONFIGS[mention.roleSlug as RoleSlug];
+        // Resolve role config: check custom roles first, then defaults
+        let roleConfig: RoleConfig | null = ROLE_CONFIGS[mention.roleSlug as RoleSlug] || null;
+        let roleDefaultModel: string | null = null;
+
+        if (workspaceId) {
+          const { data: customRole } = await supabase
+            .from('custom_roles')
+            .select('personality, name, title, challenge_rules, artifact_type, default_model')
+            .eq('workspace_id', workspaceId)
+            .eq('slug', mention.roleSlug)
+            .eq('is_active', true)
+            .single();
+
+          if (customRole) {
+            roleDefaultModel = customRole.default_model || null;
+            if (customRole.personality) {
+              roleConfig = roleConfig
+                ? { ...roleConfig, systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''), name: customRole.name, title: customRole.title }
+                : { slug: mention.roleSlug as RoleSlug, name: customRole.name, title: customRole.title, systemPrompt: customRole.personality, outputSchema: z.any(), artifactType: customRole.artifact_type || 'Analysis' };
+            }
+          }
+        }
+
         if (!roleConfig) continue;
+
+        const { model, modelSlug } = resolveModel({ roleDefaultModel });
 
         // Send role header
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'role_start',
           roleSlug: mention.roleSlug,
-          roleName: mention.roleName,
+          roleName: roleConfig.name || mention.roleName,
+          modelUsed: modelSlug,
         })}\n\n`));
 
         // Build system prompt
@@ -198,7 +224,7 @@ This will be shown to the user as a suggestion, not an automatic trigger.`,
 
         try {
           const result = streamText({
-            model: roleModel,
+            model,
             system: systemPrompt,
             messages: [{ role: 'user' as const, content: mention.instruction + (fileContext ? '\n' + fileContext : '') }],
           });
@@ -214,13 +240,14 @@ This will be shown to the user as a suggestion, not an automatic trigger.`,
             })}\n\n`));
           }
 
-          // Save assistant message
+          // Save assistant message with model tracking
           await supabase.from('messages').insert({
             chat_id: chatId,
             workspace_id: workspaceId,
             role_slug: mention.roleSlug,
             sender: 'assistant',
             content: fullResponse,
+            model_used: modelSlug,
           });
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({

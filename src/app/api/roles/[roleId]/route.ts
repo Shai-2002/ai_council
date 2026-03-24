@@ -12,7 +12,7 @@ export async function PATCH(
   const updates = await req.json();
   const allowed: Record<string, unknown> = {};
 
-  const editableFields = ['name', 'title', 'description', 'personality', 'challenge_rules', 'color', 'icon', 'artifact_type', 'is_active', 'sort_order'];
+  const editableFields = ['name', 'title', 'description', 'personality', 'challenge_rules', 'color', 'icon', 'artifact_type', 'is_active', 'sort_order', 'default_model'];
   for (const field of editableFields) {
     if (updates[field] !== undefined) {
       allowed[field] = updates[field];

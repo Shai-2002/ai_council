@@ -20,8 +20,17 @@ interface CustomRole {
   color: string;
   icon: string;
   artifact_type: string;
+  default_model: string;
   is_default: boolean;
   is_active: boolean;
+}
+
+interface ModelOption {
+  slug: string;
+  display_name: string;
+  provider: string;
+  category: string;
+  cost_tier: string;
 }
 
 export default function SettingsPage() {
@@ -29,6 +38,7 @@ export default function SettingsPage() {
   const { refreshRoles } = useRoles();
   const { theme, setTheme } = useTheme();
   const [roles, setRoles] = useState<CustomRole[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
@@ -47,6 +57,10 @@ export default function SettingsPage() {
     fetch(`/api/roles?workspaceId=${workspaceId}`)
       .then(r => r.json())
       .then(data => setRoles(data.roles || []))
+      .catch(console.error);
+    fetch('/api/models')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setModels(data); })
       .catch(console.error);
   }, [workspaceId]);
 
@@ -299,6 +313,7 @@ export default function SettingsPage() {
               <DialogTitle>Edit {editingRole.name}</DialogTitle>
               <EditRoleForm
                 role={editingRole}
+                models={models}
                 onSave={(updates) => updateRole(editingRole.id, updates)}
                 onCancel={() => setEditingRole(null)}
               />
@@ -310,12 +325,20 @@ export default function SettingsPage() {
   );
 }
 
-function EditRoleForm({ role, onSave, onCancel }: { role: CustomRole; onSave: (u: Partial<CustomRole>) => void; onCancel: () => void }) {
+function EditRoleForm({ role, models, onSave, onCancel }: { role: CustomRole; models: ModelOption[]; onSave: (u: Partial<CustomRole>) => void; onCancel: () => void }) {
   const [name, setName] = useState(role.name);
   const [title, setTitle] = useState(role.title);
   const [description, setDescription] = useState(role.description);
   const [personality, setPersonality] = useState(role.personality);
   const [color, setColor] = useState(role.color);
+  const [defaultModel, setDefaultModel] = useState(role.default_model || 'anthropic/claude-sonnet-4-20250514');
+
+  // Group models by provider
+  const modelsByProvider = models.reduce((acc, m) => {
+    if (!acc[m.provider]) acc[m.provider] = [];
+    acc[m.provider].push(m);
+    return acc;
+  }, {} as Record<string, ModelOption[]>);
 
   return (
     <div className="space-y-4 mt-2">
@@ -330,6 +353,25 @@ function EditRoleForm({ role, onSave, onCancel }: { role: CustomRole; onSave: (u
       <div>
         <label className="text-sm font-medium block mb-1">Description</label>
         <input value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm outline-none" />
+      </div>
+      <div>
+        <label className="text-sm font-medium block mb-1">Default Model</label>
+        <select
+          value={defaultModel}
+          onChange={e => setDefaultModel(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm outline-none"
+        >
+          {Object.entries(modelsByProvider).map(([provider, providerModels]) => (
+            <optgroup key={provider} label={provider}>
+              {providerModels.map(m => (
+                <option key={m.slug} value={m.slug}>
+                  {m.display_name} ({m.cost_tier})
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <p className="text-xs text-zinc-400 mt-1">This model will be used by default for this persona&apos;s responses.</p>
       </div>
       <div>
         <label className="text-sm font-medium block mb-1">Personality & Instructions</label>
@@ -349,7 +391,7 @@ function EditRoleForm({ role, onSave, onCancel }: { role: CustomRole; onSave: (u
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSave({ name, title, description, personality, color })}>Save</Button>
+        <Button onClick={() => onSave({ name, title, description, personality, color, default_model: defaultModel })}>Save</Button>
       </div>
     </div>
   );

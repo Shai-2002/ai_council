@@ -2,7 +2,7 @@ import { streamText, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { roleModel } from '@/lib/ai/provider';
+import { resolveModel } from '@/lib/ai/router';
 import { ROLE_CONFIGS, type RoleConfig } from '@/lib/ai/roles';
 import type { RoleSlug } from '@/types';
 
@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   // V6 transport sends: { trigger, chatId, messages, ...customBody }
-  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId } = body;
+  const { messages: rawMessages, roleSlug, workspaceId, chatId, projectId, modelOverride } = body;
 
   // We'll resolve roleConfig after creating the supabase client (need it for custom role lookup)
   let roleConfig: RoleConfig | null = ROLE_CONFIGS[roleSlug as RoleSlug] || null;
@@ -45,35 +45,37 @@ export async function POST(req: Request) {
   }
 
   // Check for custom role override from database
+  let roleDefaultModel: string | null = null;
   if (workspaceId) {
     const { data: customRole } = await supabase
       .from('custom_roles')
-      .select('personality, name, title, description, challenge_rules, artifact_type')
+      .select('personality, name, title, description, challenge_rules, artifact_type, default_model')
       .eq('workspace_id', workspaceId)
       .eq('slug', roleSlug)
       .eq('is_active', true)
       .single();
 
-    if (customRole && customRole.personality) {
-      if (roleConfig) {
-        // Override built-in role with custom personality
-        roleConfig = {
-          ...roleConfig,
-          systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
-          name: customRole.name,
-          title: customRole.title,
-          artifactType: customRole.artifact_type || roleConfig.artifactType,
-        };
-      } else {
-        // Fully custom role (not one of the 5 defaults)
-        roleConfig = {
-          slug: roleSlug as RoleSlug,
-          name: customRole.name,
-          title: customRole.title,
-          systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
-          outputSchema: z.any(),
-          artifactType: customRole.artifact_type || 'Analysis',
-        };
+    if (customRole) {
+      roleDefaultModel = customRole.default_model || null;
+      if (customRole.personality) {
+        if (roleConfig) {
+          roleConfig = {
+            ...roleConfig,
+            systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
+            name: customRole.name,
+            title: customRole.title,
+            artifactType: customRole.artifact_type || roleConfig.artifactType,
+          };
+        } else {
+          roleConfig = {
+            slug: roleSlug as RoleSlug,
+            name: customRole.name,
+            title: customRole.title,
+            systemPrompt: customRole.personality + (customRole.challenge_rules ? '\n\n' + customRole.challenge_rules : ''),
+            outputSchema: z.any(),
+            artifactType: customRole.artifact_type || 'Analysis',
+          };
+        }
       }
     }
   }
@@ -241,15 +243,21 @@ export async function POST(req: Request) {
   // ===== ASSEMBLE SYSTEM PROMPT (6 layers) =====
   const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}`;
 
+  // ===== RESOLVE MODEL =====
+  const { model, modelSlug } = resolveModel({
+    modelOverride: modelOverride || null,
+    roleDefaultModel,
+  });
+
   // Stream the response
   const result = streamText({
-    model: roleModel,
+    model,
     system: systemPrompt,
     messages,
     onFinish: async ({ text }) => {
       if (!workspaceId) return;
 
-      // Save the user's last message and assistant response with chat_id
+      // Save the user's last message and assistant response with chat_id + model_used
       const lastUserMessage = messages[messages.length - 1];
       if (lastUserMessage?.role === 'user') {
         await supabase.from('messages').insert({
@@ -267,6 +275,7 @@ export async function POST(req: Request) {
         sender: 'assistant',
         content: text,
         chat_id: chatId || null,
+        model_used: modelSlug,
       });
 
       // Try to detect and save artifact from JSON in response
