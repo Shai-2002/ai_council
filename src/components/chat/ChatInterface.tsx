@@ -16,6 +16,11 @@ function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> 
     .join('') || '';
 }
 
+function safeDescription(desc: string | undefined, fallback: string): string {
+  if (!desc || desc.length > 100) return fallback;
+  return desc;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ChatInterface({ role, workspaceId, chatId, projectId, initialMessages }: { role: Role; workspaceId?: string | null; chatId?: string; projectId?: string; initialMessages?: any[] }) {
   const { messages, sendMessage, status } = useRoleChat({
@@ -125,7 +130,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
                 Chat with {role.name}
               </h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md">
-                {role.description}. Ask anything to get started.
+                {safeDescription(role.description, `${role.title} expertise`)}. Ask anything to get started.
               </p>
             </div>
           )}
@@ -193,7 +198,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
             </div>
             <div className="text-center mt-2">
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                The {role.title} analyzes your input based on {role.description.toLowerCase()}.
+                The {role.title} analyzes your input based on {safeDescription(role.description, role.title.toLowerCase()).toLowerCase()}.
               </span>
             </div>
           </div>
