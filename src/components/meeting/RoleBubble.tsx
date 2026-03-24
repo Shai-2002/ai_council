@@ -4,15 +4,42 @@ import { useRoles } from "@/lib/hooks/useRoles";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { VersionNavigator } from "../chat/VersionNavigator";
+import { RetryButton } from "../chat/RetryButton";
+import { ViolationBanner } from "../commitments/ViolationBanner";
+import { CommitmentDetectionCard } from "../commitments/CommitmentDetectionCard";
 
 interface RoleBubbleProps {
+  id?: string;
   roleSlug: string;
   roleName: string;
   content: string;
   isStreaming?: boolean;
+  modelUsed?: string;
+  currentVersion?: number;
+  totalVersions?: number;
+  versionGroupId?: string;
+  extractedRule?: string;
+  isRuleConfirmed?: boolean;
+  violation?: boolean;
+  violatedRule?: string;
 }
 
-export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBubbleProps) {
+export function RoleBubble({ 
+  id = "temp-id", 
+  roleSlug, 
+  roleName, 
+  content, 
+  isStreaming, 
+  modelUsed,
+  currentVersion = 1,
+  totalVersions = 1,
+  versionGroupId,
+  extractedRule,
+  isRuleConfirmed,
+  violation,
+  violatedRule
+}: RoleBubbleProps) {
   const { rolesMap } = useRoles();
   const role = rolesMap[roleSlug] || {
     name: roleName || roleSlug,
@@ -52,6 +79,11 @@ export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBub
             <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold ${role.bgDark} text-white`}>
               {role.title || "AI"}
             </span>
+            {modelUsed && !isStreaming && (
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                &middot; via {modelUsed}
+              </span>
+            )}
             {(content.toLowerCase().includes('i disagree') ||
               content.toLowerCase().includes('that contradicts') ||
               content.toLowerCase().includes('i would push back') ||
@@ -61,6 +93,14 @@ export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBub
               </span>
             )}
           </div>
+
+          {violation && violatedRule && (
+            <ViolationBanner
+              ruleText={violatedRule}
+              onOverride={() => console.log('Overridden')}
+              onUpdateRule={() => console.log('Update rule')}
+            />
+          )}
 
           <div
             className={`px-4 py-3 rounded-2xl text-sm leading-relaxed bg-white dark:bg-zinc-900 shadow-sm rounded-tl-sm border-y border-r border-zinc-200 dark:border-zinc-800 w-full border-l-2 ${getBorderColor(role.bgDark)}`}
@@ -107,7 +147,35 @@ export function RoleBubble({ roleSlug, roleName, content, isStreaming }: RoleBub
                 </div>
             )}
             
+            {/* Action Bar */}
+            {!isStreaming && (
+              <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-2 overflow-hidden group">
+                <div className="flex items-center gap-3">
+                  <VersionNavigator
+                    versionGroupId={versionGroupId || id}
+                    currentVersion={currentVersion}
+                    totalVersions={totalVersions}
+                    onSwitchVersion={(v) => console.log('Switch role bubble to version', v)}
+                  />
+                </div>
+                <div className="flex flex-1 min-w-[100px] justify-end">
+                  <RetryButton
+                    messageId={id}
+                    onRetry={(msgId, model) => console.log('Retrying role bubble', msgId, 'with model', model)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
+
+          {extractedRule && !isRuleConfirmed && (
+            <CommitmentDetectionCard
+              extractedRule={extractedRule}
+              onConfirm={(scope) => console.log('Confirmed rule:', extractedRule, 'scope:', scope)}
+              onDismiss={() => console.log('Dismissed rule')}
+            />
+          )}
+
         </div>
       </div>
     </div>

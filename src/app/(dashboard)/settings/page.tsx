@@ -7,7 +7,8 @@ import { useTheme } from "@/lib/hooks/useTheme";
 import { ROLE_TEMPLATES, COLOR_CLASSES, ROLE_COLORS } from "@/lib/role-templates";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { User, Palette, Users, Plus, Trash2, Edit2, Sun, Moon, Monitor, Check } from "lucide-react";
+import { User, Palette, Users, Plus, Trash2, Edit2, Sun, Moon, Monitor, Check, ClipboardList } from "lucide-react";
+import { CommitmentsPanel } from "@/components/settings/CommitmentsPanel";
 
 interface CustomRole {
   id: string;
@@ -45,7 +46,7 @@ export default function SettingsPage() {
   const [newRoleTitle, setNewRoleTitle] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [tab, setTab] = useState<'profile' | 'personas' | 'appearance'>('profile');
+  const [tab, setTab] = useState<'profile' | 'personas' | 'appearance' | 'rules'>('profile');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -132,6 +133,7 @@ export default function SettingsPage() {
             { key: 'profile' as const, icon: User, label: 'Profile' },
             { key: 'personas' as const, icon: Users, label: 'Personas' },
             { key: 'appearance' as const, icon: Palette, label: 'Appearance' },
+            { key: 'rules' as const, icon: ClipboardList, label: 'Rules' },
           ].map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -243,6 +245,11 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Rules Tab */}
+        {tab === 'rules' && (
+          <CommitmentsPanel workspaceId={workspaceId} />
         )}
 
         {/* Create Persona Dialog */}

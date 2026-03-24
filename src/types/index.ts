@@ -19,6 +19,13 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   modelUsed?: string;
+  currentVersion?: number;
+  totalVersions?: number;
+  extractedRule?: string;
+  isRuleConfirmed?: boolean;
+  violation?: boolean;
+  violatedRule?: string;
+  versionGroupId?: string;
 }
 
 export interface Artifact {
@@ -47,7 +54,7 @@ export interface Chat {
   workspace_id: string;
   project_id: string | null;
   title: string;
-  chat_type: 'single' | 'meeting_room';
+  chat_type: 'single' | 'meeting_room' | 'direct';
   role_slug: string | null;
   is_archived: boolean;
   created_at: string;

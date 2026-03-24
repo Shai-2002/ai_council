@@ -280,11 +280,22 @@ export async function POST(req: Request) {
   // ===== ASSEMBLE SYSTEM PROMPT (7 layers) =====
   const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}${commitmentsContext}`;
 
-  // ===== RESOLVE MODEL =====
-  const { model, modelSlug } = resolveModel({
-    modelOverride: modelOverride || null,
-    roleDefaultModel,
-  });
+  // ===== RESOLVE MODEL (with fallback) =====
+  let model;
+  let modelSlug;
+  try {
+    const resolved = resolveModel({
+      modelOverride: modelOverride || null,
+      roleDefaultModel,
+    });
+    model = resolved.model;
+    modelSlug = resolved.modelSlug;
+  } catch {
+    // Fallback to known-working model
+    const { openrouter } = await import('@/lib/ai/provider');
+    model = openrouter('anthropic/claude-sonnet-4.6');
+    modelSlug = 'anthropic/claude-sonnet-4.6';
+  }
 
   // Stream the response
   const result = streamText({

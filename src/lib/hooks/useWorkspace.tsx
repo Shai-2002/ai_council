@@ -1,24 +1,31 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 interface WorkspaceContextValue {
   workspaceId: string | null;
   profile: { id: string; full_name: string | null; avatar_url: string | null; subscription_status: string } | null;
   loading: boolean;
+  refreshKey: number;
+  triggerRefresh: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue>({
   workspaceId: null,
   profile: null,
   loading: true,
+  refreshKey: 0,
+  triggerRefresh: () => {},
 });
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [profile, setProfile] = useState<WorkspaceContextValue['profile']>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   useEffect(() => {
     async function load() {
@@ -54,7 +61,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <WorkspaceContext.Provider value={{ workspaceId, profile, loading }}>
+    <WorkspaceContext.Provider value={{ workspaceId, profile, loading, refreshKey, triggerRefresh }}>
       {children}
     </WorkspaceContext.Provider>
   );

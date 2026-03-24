@@ -2,6 +2,10 @@ import { Message, Role } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { VersionNavigator } from "./VersionNavigator";
+import { RetryButton } from "./RetryButton";
+import { ViolationBanner } from "../commitments/ViolationBanner";
+import { CommitmentDetectionCard } from "../commitments/CommitmentDetectionCard";
 
 export function MessageBubble({ message, role }: { message: Message; role: Role }) {
   const isUser = message.role === "user";
@@ -28,6 +32,14 @@ export function MessageBubble({ message, role }: { message: Message; role: Role 
               </span>
             )}
           </div>
+
+          {!isUser && message.violation && message.violatedRule && (
+            <ViolationBanner
+              ruleText={message.violatedRule}
+              onOverride={() => console.log('Overridden')}
+              onUpdateRule={() => console.log('Update rule')}
+            />
+          )}
 
           <div
             className={`px-4 py-3 rounded-2xl text-sm leading-relaxed
@@ -66,7 +78,41 @@ export function MessageBubble({ message, role }: { message: Message; role: Role 
               </ReactMarkdown>
               </div>
             )}
+            
+            {/* Action Bar */}
+            {!isUser && (
+              <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-2 overflow-hidden group">
+                <div className="flex items-center gap-3">
+                  <VersionNavigator
+                    versionGroupId={message.versionGroupId || message.id}
+                    currentVersion={message.currentVersion || 1}
+                    totalVersions={message.totalVersions || 1}
+                    onSwitchVersion={(v) => console.log('Switch to version', v)}
+                  />
+                  {message.modelUsed && (
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
+                      via {message.modelUsed}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-3 flex-1 min-w-[100px]">
+                  <RetryButton
+                    messageId={message.id}
+                    onRetry={(id, model) => console.log('Retrying message', id, 'with model', model)}
+                  />
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 ml-auto whitespace-nowrap hidden sm:inline-block">Just now</span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {!isUser && message.extractedRule && !message.isRuleConfirmed && (
+            <CommitmentDetectionCard
+              extractedRule={message.extractedRule}
+              onConfirm={(scope) => console.log('Confirmed rule:', message.extractedRule, 'scope:', scope)}
+              onDismiss={() => console.log('Dismissed rule')}
+            />
+          )}
         </div>
       </div>
     </div>

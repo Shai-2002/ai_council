@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Insert file record with 'processing' status
+    // Insert file record with 'pending' status — return immediately
     const { data: fileRecord, error: insertError } = await supabase
       .from('files')
       .insert({
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         file_type: file.type,
         size_bytes: file.size,
         storage_path: storagePath,
-        extraction_status: 'processing',
+        extraction_status: 'pending',
         source: 'upload',
       })
       .select()
@@ -66,25 +66,6 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Extract text inline using Claude (for PDF) or mammoth (for DOCX)
-    // This runs before returning, ensuring text is available for the next chat message
-    let extractedText = '';
-    try {
-      extractedText = await extractText(buffer, file.type);
-    } catch (err) {
-      console.error('Extraction failed:', err);
-    }
-
-    const extractionStatus = extractedText && extractedText.length > 50 ? 'done' : 'failed';
-
-    await supabase
-      .from('files')
-      .update({
-        extracted_text: extractedText || null,
-        extraction_status: extractionStatus,
-      })
-      .eq('id', fileRecord.id);
-
     // Get signed URL
     const { data: urlData } = await supabase.storage
       .from('workspace-files')
@@ -92,9 +73,21 @@ export async function POST(req: Request) {
 
     results.push({
       ...fileRecord,
-      extracted_text: extractedText || null,
-      extraction_status: extractionStatus,
       download_url: urlData?.signedUrl || null,
+    });
+
+    // Fire extraction in background — don't block the response
+    // Using fire-and-forget pattern (the promise runs but we don't await it)
+    const fileId = fileRecord.id;
+    extractText(buffer, file.type).then(async (text) => {
+      await supabase.from('files').update({
+        extracted_text: text && text.length > 50 ? text.slice(0, 50000) : null,
+        extraction_status: text && text.length > 50 ? 'done' : 'failed',
+      }).eq('id', fileId);
+    }).catch(async () => {
+      await supabase.from('files').update({
+        extraction_status: 'failed',
+      }).eq('id', fileId);
     });
   }
 

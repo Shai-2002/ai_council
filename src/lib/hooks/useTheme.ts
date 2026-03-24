@@ -35,17 +35,18 @@ export function useTheme() {
   const setTheme = useCallback(async (newTheme: Theme) => {
     setThemeState(newTheme);
     localStorage.setItem('theme', newTheme);
+
+    // Set cookie for server-side rendering (prevents flash)
+    document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+
     applyTheme(newTheme);
 
-    try {
-      await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: newTheme }),
-      });
-    } catch {
-      // Ignore — localStorage is the primary source
-    }
+    // Persist to DB (non-blocking)
+    fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: newTheme }),
+    }).catch(() => {});
   }, []);
 
   return { theme, setTheme };

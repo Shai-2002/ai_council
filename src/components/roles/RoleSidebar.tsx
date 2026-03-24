@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layers, FileText, ChevronDown, ChevronRight, Folder, FolderInput, MessageSquare, Plus, Trash2, Users } from "lucide-react";
+import { Layers, FileText, ChevronDown, ChevronRight, Folder, FolderInput, MessageSquare, Plus, Trash2, Users, BotMessageSquare } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { useRoles } from "@/lib/hooks/useRoles";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
@@ -12,6 +12,7 @@ import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { UserMenu } from "@/components/shared/UserMenu";
 import { MoveToProjectDialog } from "@/components/shared/MoveToProjectDialog";
 import { Separator } from "@/components/ui/separator";
+import { ProjectHealthBars } from "@/components/projects/ProjectHealthBars";
 
 function IconByName({ name, className }: { name: string; className?: string }) {
   const Icon = (LucideIcons as unknown as Record<string, React.ElementType>)[name];
@@ -36,16 +37,18 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { roles, rolesMap } = useRoles();
   const pathname = usePathname();
   const router = useRouter();
-  const { workspaceId } = useWorkspace();
+  const { workspaceId, refreshKey, triggerRefresh } = useWorkspace();
 
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
   const [expandedHistory, setExpandedHistory] = useState<string[]>([]);
   const [isMeetingRoomExpanded, setIsMeetingRoomExpanded] = useState(false);
+  const [isDirectChatExpanded, setIsDirectChatExpanded] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
 
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [chatHistory, setChatHistory] = useState<Record<string, SidebarChat[]>>({});
   const [meetingRooms, setMeetingRooms] = useState<SidebarChat[]>([]);
+  const [directChats, setDirectChats] = useState<SidebarChat[]>([]);
   const [moveChatId, setMoveChatId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -75,10 +78,13 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         const allChats = await chatsRes.json();
         const grouped: Record<string, SidebarChat[]> = {};
         const meetings: SidebarChat[] = [];
+        const directs: SidebarChat[] = [];
         for (const chat of allChats) {
           if (!chat.project_id) {
             if (chat.chat_type === 'meeting_room') {
               meetings.push({ id: chat.id, title: chat.title || 'Meeting Room', updated_at: chat.updated_at });
+            } else if (chat.chat_type === 'direct') {
+              directs.push({ id: chat.id, title: chat.title || 'Direct Chat', updated_at: chat.updated_at });
             } else if (chat.role_slug) {
               if (!grouped[chat.role_slug]) grouped[chat.role_slug] = [];
               grouped[chat.role_slug].push({ id: chat.id, title: chat.title, updated_at: chat.updated_at });
@@ -87,13 +93,14 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
         }
         setChatHistory(grouped);
         setMeetingRooms(meetings);
+        setDirectChats(directs);
       }
     } catch { /* ignore */ }
   }, [workspaceId]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   const toggleProject = (id: string) => {
     setExpandedProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
@@ -118,6 +125,16 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
     const chat = await onCreateChat({ title: "New Meeting Room", chatType: "meeting_room" });
     loadData();
     router.push(`/meeting-room/${chat.id}`);
+    if (onNavigate) onNavigate();
+  };
+
+  const handleCreateDirectChat = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Simulate creation for Direct Chat
+    // Use the existing fallback routing if backend rejects "direct" type
+    const chatId = `chat-${Date.now()}`;
+    router.push(`/direct/${chatId}`);
     if (onNavigate) onNavigate();
   };
 
@@ -240,6 +257,59 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
           )}
         </div>
 
+        {/* DIRECT CHAT */}
+        <div className="space-y-1 mt-6">
+          <div className="flex items-center justify-between px-2 mb-2 group cursor-pointer" onClick={() => setIsDirectChatExpanded(!isDirectChatExpanded)}>
+            <div className="flex items-center gap-2">
+              {isDirectChatExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />}
+              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                Direct Chat
+              </span>
+            </div>
+            <button
+              onClick={handleCreateDirectChat}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all cursor-pointer"
+              title="New direct chat"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {isDirectChatExpanded && (
+            <div className="pl-6 pr-2 space-y-0.5 pb-2">
+              {directChats.length === 0 && (
+                <p className="px-2 text-xs text-zinc-400 dark:text-zinc-500">No chats yet</p>
+              )}
+              {directChats.map(chat => {
+                const isChatActive = pathname === `/direct/${chat.id}`;
+                return (
+                  <div key={chat.id} className="flex items-center justify-between group">
+                    <Link
+                      href={`/direct/${chat.id}`}
+                      onClick={handleNavClick}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors truncate flex-1 ${
+                        isChatActive
+                          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
+                      }`}
+                    >
+                      <BotMessageSquare className="h-3 w-3 shrink-0 opacity-70" />
+                      <span className="truncate">{chat.title}</span>
+                    </Link>
+                    <button
+                      title="Delete chat"
+                      onClick={(e) => handleDeleteChat(chat.id, e)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity px-1 shrink-0"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* PROJECTS */}
         <div className="space-y-1 mt-6">
           <div className="flex items-center justify-between px-2 mb-2">
@@ -270,9 +340,10 @@ export function RoleSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   <div className="flex items-center gap-2 overflow-hidden flex-1">
                     {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />}
                     <Folder className="h-4 w-4 shrink-0 text-indigo-500" />
-                    <Link href={`/projects/${project.id}`} onClick={(e) => { e.stopPropagation(); handleNavClick(); }} className="text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1">
+                    <Link href={`/projects/${project.id}`} onClick={(e) => { e.stopPropagation(); handleNavClick(); }} className="text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-[0_1_auto]">
                        {project.name}
                     </Link>
+                    <ProjectHealthBars />
                   </div>
                   <button
                     onClick={(e) => handleDeleteProject(project.id, e)}

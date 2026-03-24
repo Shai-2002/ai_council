@@ -8,6 +8,7 @@ import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal } from "lucide-react";
 import { FileUploadButton, FileChips, type UploadedFile } from "./FileUpload";
+import { ModelPicker } from "./ModelPicker";
 
 function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -32,6 +33,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
   });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [modelOverride, setModelOverride] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
@@ -90,7 +92,8 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
     setFiles([]);
 
     try {
-      await sendMessage({ text });
+      await sendMessage({ text, ...(modelOverride ? { modelOverride } : {}) });
+      setModelOverride(null);
     } catch (err) {
       console.error('Send failed:', err);
     }
@@ -107,6 +110,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
     id: msg.id,
     role: msg.role as 'user' | 'assistant',
     content: getMessageContent(msg),
+    modelUsed: (msg as { model_used?: string }).model_used,
   }));
 
   const doneFiles = files.filter(f => f.status === 'done');
@@ -178,23 +182,30 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Ask ${role.name} for advice...`}
-                className="block min-h-[48px] max-h-[120px] flex-1 resize-none border-0 bg-transparent py-3 pl-1 pr-14 text-left text-base leading-normal placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
+                className="block min-h-[48px] max-h-[120px] flex-1 resize-none border-0 bg-transparent py-3 pl-1 pr-40 text-left text-base leading-normal placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                 rows={1}
               />
-              <Button
-                type="button"
-                size="icon"
-                className={`absolute right-2 bottom-2 h-9 w-9 rounded-xl transition-all ${
-                  hasContent
-                    ? `${role.bgDark} text-white hover:opacity-90`
-                    : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-300 dark:hover:bg-zinc-700"
-                }`}
-                onClick={handleSend}
-                disabled={!hasContent || isLoading}
-              >
-                <SendHorizontal className="h-4 w-4" />
-                <span className="sr-only">Send Message</span>
-              </Button>
+              <div className="absolute right-2 bottom-2 flex items-center gap-2">
+                <ModelPicker 
+                  selectedModelId={modelOverride} 
+                  onModelSelect={setModelOverride} 
+                  defaultModelName="Claude Sonnet 4"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  className={`h-9 w-9 rounded-xl transition-all ${
+                    hasContent
+                      ? `${role.bgDark} text-white hover:opacity-90`
+                      : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                  onClick={handleSend}
+                  disabled={!hasContent || isLoading}
+                >
+                  <SendHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Send Message</span>
+                </Button>
+              </div>
             </div>
             <div className="text-center mt-2">
               <span className="text-xs text-zinc-400 dark:text-zinc-500">

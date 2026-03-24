@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilePool } from "@/components/files/FilePool";
 import { MeetingRoomChat } from "@/components/meeting/MeetingRoomChat";
+import { ProjectHealthCard } from "@/components/projects/ProjectHealthCard";
 import { onCreateChat } from "@/lib/placeholder";
 import {
   DropdownMenu,
@@ -198,6 +199,11 @@ export default function ProjectDetail() {
               <Button size="sm" variant="ghost" onClick={() => setIsRenaming(false)}>Cancel</Button>
             </div>
           )}
+        </div>
+
+        {/* Project Health */}
+        <div className="mt-8">
+          <ProjectHealthCard />
         </div>
 
         {/* Tabs */}
