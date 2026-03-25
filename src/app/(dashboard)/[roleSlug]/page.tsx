@@ -5,6 +5,7 @@ import { notFound, useParams } from "next/navigation";
 import { useRoles } from "@/lib/hooks/useRoles";
 import { RoleHeader } from "@/components/roles/RoleHeader";
 import { ChatInterface } from "@/components/chat/ChatInterface";
+import { SidePanel } from "@/components/panel/SidePanel";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 
 export default function RoleChatPage() {
@@ -72,12 +73,20 @@ export default function RoleChatPage() {
       <div className="shrink-0">
         <RoleHeader role={role} />
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        <ChatInterface
-          key={`${roleSlug}-${workspaceId}-${chatId}`}
-          role={role}
-          workspaceId={workspaceId}
+      <div className="flex-1 min-h-0 overflow-hidden relative flex">
+        <div className="flex-1 min-w-0 h-full relative">
+          <ChatInterface
+            key={`${roleSlug}-${workspaceId}-${chatId}`}
+            role={role}
+            workspaceId={workspaceId}
+            chatId={chatId ?? undefined}
+          />
+        </div>
+        <SidePanel 
+          workspaceId={workspaceId || "default"}
           chatId={chatId ?? undefined}
+          mode="single"
+          currentRoleSlug={roleSlug}
         />
       </div>
     </div>

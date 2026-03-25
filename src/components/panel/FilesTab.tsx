@@ -68,7 +68,7 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
         sizeBytes: f.size,
         status: 'processing' as const,
         type: f.type,
-        scope: chatId ? 'chat' : projectId ? 'project' : 'workspace' as const
+        scope: (chatId ? 'chat' : projectId ? 'project' : 'workspace') as 'chat' | 'project' | 'workspace'
       }));
 
       setFiles(prev => [...newFiles, ...prev]);

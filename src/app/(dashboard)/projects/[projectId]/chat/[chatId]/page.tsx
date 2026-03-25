@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useRoles } from "@/lib/hooks/useRoles";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { ChatInterface } from "@/components/chat/ChatInterface";
+import { SidePanel } from "@/components/panel/SidePanel";
 import { ChevronRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -72,12 +73,21 @@ export default function ProjectChatPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {role ? (
-          <ChatInterface role={role} workspaceId={workspaceId} chatId={chatIdStr} projectId={projectIdStr} />
-        ) : (
-          <div className="p-8">Role configuration not found.</div>
-        )}
+      <div className="flex-1 min-h-0 overflow-hidden relative flex">
+        <div className="flex-1 min-w-0 h-full relative">
+          {role ? (
+            <ChatInterface role={role} workspaceId={workspaceId} chatId={chatIdStr} projectId={projectIdStr} />
+          ) : (
+            <div className="p-8">Role configuration not found.</div>
+          )}
+        </div>
+        <SidePanel 
+          workspaceId={workspaceId || "default"}
+          chatId={chatIdStr}
+          projectId={projectIdStr}
+          mode="single"
+          currentRoleSlug={role?.slug}
+        />
       </div>
     </div>
   );

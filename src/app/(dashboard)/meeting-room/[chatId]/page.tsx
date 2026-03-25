@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Users } from "lucide-react";
 import Link from "next/link";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
+import { SidePanel } from "@/components/panel/SidePanel";
 import { useEffect, useState } from "react";
 
 export default function MeetingRoomInstancePage() {
@@ -55,7 +56,16 @@ export default function MeetingRoomInstancePage() {
       </div>
 
       {/* Chat Body */}
-      <MeetingRoomChat chatId={chatId as string} workspaceId={workspaceId || "default"} />
+      <div className="flex-1 overflow-hidden flex relative">
+        <div className="flex-1 min-w-0 h-full">
+          <MeetingRoomChat chatId={chatId as string} workspaceId={workspaceId || "default"} />
+        </div>
+        <SidePanel 
+          workspaceId={workspaceId || "default"}
+          chatId={chatId as string}
+          mode="meeting"
+        />
+      </div>
     </div>
   );
 }

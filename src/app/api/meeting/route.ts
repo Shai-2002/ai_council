@@ -158,6 +158,24 @@ export async function POST(req: Request) {
     `${(a.role_slug || '').toUpperCase()}: ${a.title}`
   ).join('\n') || '';
 
+  // Run research once (shared across all roles)
+  let sharedResearch = '';
+  try {
+    const { needsResearch, runResearch } = await import('@/lib/ai/research');
+    if (needsResearch(message)) {
+      const research = await runResearch(message, {
+        name: 'Executive Team',
+        title: 'Advisory Board',
+        domain: 'business strategy',
+      });
+      if (research) {
+        sharedResearch = `\n\n=== INTERNET RESEARCH ===\n${research}\n===`;
+      }
+    }
+  } catch {
+    // Research pipeline failed — continue without it
+  }
+
   // Generate sequential responses via SSE
   const encoder = new TextEncoder();
 
@@ -236,6 +254,7 @@ Do NOT be diplomatic about genuine disagreements. The user needs to see where th
 At the END of your response, if you believe another executive should weigh in on something you said, add a line:
 [SUGGEST: @RoleName should respond to my point about X]
 This will be shown to the user as a suggestion, not an automatic trigger.`,
+          sharedResearch,
         ].filter(Boolean).join('\n\n');
 
         try {

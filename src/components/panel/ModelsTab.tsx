@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Search, Radio, Circle } from "lucide-react";
 import { ModelDropdown, type ModelOption } from "./ModelDropdown";
 import { useRoles } from "@/lib/hooks/useRoles";
+import { type Role } from "@/types";
 
 interface ModelsTabProps {
   mode: 'single' | 'meeting' | 'direct';
@@ -22,7 +23,7 @@ const AVAILABLE_MODELS: ModelOption[] = [
 ];
 
 export function ModelsTab({ mode, currentRoleSlug }: ModelsTabProps) {
-  const { rolesArray, rolesMap } = useRoles();
+  const { roles, rolesMap } = useRoles();
   const [overrideModel, setOverrideModel] = useState<string>("default");
   
   // Local state to simulate patched model assignments
@@ -102,7 +103,7 @@ export function ModelsTab({ mode, currentRoleSlug }: ModelsTabProps) {
           <div>
             <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Persona Models</h4>
             <div className="space-y-4">
-              {rolesArray.map(role => (
+              {roles.map((role: Role) => (
                 <div key={role.slug} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={`h-2.5 w-2.5 rounded-full ${role.bgDark}`} />

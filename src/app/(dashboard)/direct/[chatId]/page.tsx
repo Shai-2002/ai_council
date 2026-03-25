@@ -18,11 +18,22 @@ export default async function DirectChatPage({ params }: { params: Promise<{ cha
 }
 
 import { DirectChatInterface } from "@/components/direct/DirectChatInterface";
+import { SidePanel } from "@/components/panel/SidePanel";
+import { useWorkspace } from "@/lib/hooks/useWorkspace";
 
 function DirectChatContainer({ chatId }: { chatId: string }) {
+  const { workspaceId } = useWorkspace();
+  
   return (
-    <div className="flex-1 min-h-0 bg-zinc-50/50 dark:bg-zinc-950 relative">
-      <DirectChatInterface chatId={chatId} />
+    <div className="flex-1 min-h-0 bg-zinc-50/50 dark:bg-zinc-950 relative flex">
+      <div className="flex-1 min-w-0 h-full relative">
+        <DirectChatInterface chatId={chatId} />
+      </div>
+      <SidePanel 
+        workspaceId={workspaceId || "default"}
+        chatId={chatId}
+        mode="direct"
+      />
     </div>
   );
 }

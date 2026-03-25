@@ -277,8 +277,27 @@ export async function POST(req: Request) {
     }
   }
 
-  // ===== ASSEMBLE SYSTEM PROMPT (7 layers) =====
-  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}${commitmentsContext}`;
+  // ===== LAYER 8: Research pipeline (Perplexity) =====
+  let researchContext = '';
+  const lastUserContent = messages[messages.length - 1]?.content || '';
+  try {
+    const { needsResearch, runResearch } = await import('@/lib/ai/research');
+    if (needsResearch(lastUserContent)) {
+      const research = await runResearch(lastUserContent, {
+        name: roleConfig.name,
+        title: roleConfig.title,
+        domain: roleConfig.title,
+      });
+      if (research) {
+        researchContext = `\n\n=== INTERNET RESEARCH (gathered by Perplexity) ===\nUse this to inform your response — cite specific data points when relevant. Synthesize through YOUR lens as the ${roleConfig.title}.\n\n${research}\n===`;
+      }
+    }
+  } catch {
+    // Research pipeline failed — continue without it
+  }
+
+  // ===== ASSEMBLE SYSTEM PROMPT (8 layers) =====
+  const systemPrompt = `${roleConfig.systemPrompt}${companyContext}${crossRoleContext}${projectContext}${fileContext}${commitmentsContext}${researchContext}`;
 
   // ===== RESOLVE MODEL (with fallback) =====
   let model;
