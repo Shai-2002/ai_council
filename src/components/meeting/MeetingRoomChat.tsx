@@ -179,7 +179,7 @@ export function MeetingRoomChat({ chatId, workspaceId, projectId: _projectId }: 
 
       {/* Input */}
       <MentionInput
-        onSend={(text, fileIds) => sendMessage(text, fileIds)}
+        onSend={(text: string, fileIds?: string[]) => sendMessage(text, fileIds)}
         disabled={isLoading || showSimulationPopup}
       />
 

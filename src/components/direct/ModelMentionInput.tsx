@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FileUploadButton, FileChips, type UploadedFile } from "@/components/chat/FileUpload";
 
 interface AIModel {
   id: string;
@@ -26,14 +25,13 @@ export const DIRECT_MODELS: AIModel[] = [
 ];
 
 interface ModelMentionInputProps {
-  onSend: (text: string, fileIds?: string[]) => void;
+  onSend: (text: string) => void;
   placeholder?: string;
   disabled?: boolean;
 }
 
 export function ModelMentionInput({ onSend, placeholder = "@mention a model...", disabled }: ModelMentionInputProps) {
   const [input, setInput] = useState("");
-  const [files, setFiles] = useState<UploadedFile[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -128,38 +126,15 @@ export function ModelMentionInput({ onSend, placeholder = "@mention a model...",
 
   const handleSend = () => {
     const trimmedInput = input.trim();
-    const doneFiles = files.filter(f => f.status === 'done');
-    const hasFiles = doneFiles.length > 0;
 
-    if (!trimmedInput && !hasFiles) return;
+    if (!trimmedInput) return;
 
-    let text = trimmedInput;
-    if (hasFiles) {
-      const fileNote = `[Attached files: ${doneFiles.map(f => f.name).join(', ')}]`;
-      text = trimmedInput
-        ? `${trimmedInput}\n\n${fileNote}`
-        : `Please review the attached file${doneFiles.length > 1 ? 's' : ''}: ${doneFiles.map(f => f.name).join(', ')}`;
-    }
-
-    onSend(text, doneFiles.map(f => f.id));
+    onSend(trimmedInput);
     setInput("");
-    setFiles([]);
     setMentionQuery(null);
   };
 
-  const handleFilesUploaded = (newFiles: UploadedFile[]) => {
-    setFiles(prev => {
-      const map = new Map(prev.map(f => [f.name, f]));
-      newFiles.forEach(f => map.set(f.name, f));
-      return Array.from(map.values());
-    });
-  };
-
-  const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
-  };
-
-  const hasContent = input.trim() || files.some(f => f.status === 'done');
+  const hasContent = input.trim().length > 0;
 
   return (
     <div className="relative w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
@@ -193,15 +168,9 @@ export function ModelMentionInput({ onSend, placeholder = "@mention a model...",
         </div>
       )}
 
-      <FileChips files={files} onRemove={removeFile} />
-
       <div className="px-4 sm:px-6 py-3">
         <div className="max-w-4xl mx-auto">
           <div className={`flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 relative ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
-            
-            <div className="shrink-0 self-end mb-1 ml-1">
-              <FileUploadButton onFilesUploaded={handleFilesUploaded} />
-            </div>
             
             <textarea
               ref={textareaRef}

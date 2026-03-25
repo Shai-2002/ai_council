@@ -48,18 +48,13 @@ export function ModelDropdown({ currentModel, onSelect, models }: ModelDropdownP
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-9 px-3 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+      <PopoverTrigger
+          className="w-full flex items-center justify-between h-9 px-3 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-lg text-sm"
         >
           <span className="truncate text-sm text-zinc-700 dark:text-zinc-300">
             {selectedModel.display_name}
           </span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[260px] p-0 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950" align="start">
         <ScrollArea className="h-[280px]">

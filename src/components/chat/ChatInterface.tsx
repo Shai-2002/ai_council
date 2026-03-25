@@ -7,8 +7,6 @@ import type { RoleSlug } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal } from "lucide-react";
-import { FileUploadButton, FileChips, type UploadedFile } from "./FileUpload";
-import { ModelPicker } from "./ModelPicker";
 
 function getMessageContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -32,8 +30,6 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
     initialMessages,
   });
   const [input, setInput] = useState("");
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [modelOverride, setModelOverride] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
@@ -59,41 +55,16 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
     });
   }, []);
 
-  const handleFilesUploaded = (newFiles: UploadedFile[]) => {
-    setFiles(prev => {
-      const map = new Map(prev.map(f => [f.name, f]));
-      newFiles.forEach(f => map.set(f.name, f));
-      return Array.from(map.values());
-    });
-  };
-
-  const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
-  };
-
   const handleSend = async () => {
     const trimmedInput = input.trim();
-    const doneFiles = files.filter(f => f.status === 'done');
-    const hasFiles = doneFiles.length > 0;
 
-    if (!trimmedInput && !hasFiles) return;
+    if (!trimmedInput) return;
     if (isLoading) return;
 
-    // Build the message — include file names so the API can find them
-    let text = trimmedInput;
-    if (hasFiles) {
-      const fileNote = `[Attached files: ${doneFiles.map(f => f.name).join(', ')}]`;
-      text = trimmedInput
-        ? `${trimmedInput}\n\n${fileNote}`
-        : `Please review the attached file${doneFiles.length > 1 ? 's' : ''}: ${doneFiles.map(f => f.name).join(', ')}`;
-    }
-
     setInput("");
-    setFiles([]);
 
     try {
-      await sendMessage({ text, ...(modelOverride ? { modelOverride } : {}) });
-      setModelOverride(null);
+      await sendMessage({ text: trimmedInput });
     } catch (err) {
       console.error('Send failed:', err);
     }
@@ -113,8 +84,7 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
     modelUsed: (msg as { model_used?: string }).model_used,
   }));
 
-  const doneFiles = files.filter(f => f.status === 'done');
-  const hasContent = input.trim() || doneFiles.length > 0;
+  const hasContent = input.trim().length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -166,31 +136,18 @@ export function ChatInterface({ role, workspaceId, chatId, projectId, initialMes
 
       {/* Input area — pinned to bottom */}
       <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <FileChips files={files} onRemove={removeFile} />
         <div className="px-4 sm:px-6 py-3">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-zinc-400 relative">
-              <div className="shrink-0 self-end">
-                <FileUploadButton
-                  workspaceId={workspaceId ?? "default"}
-                  context={{ roleSlug: role.slug, chatId, projectId }}
-                  onFilesUploaded={handleFilesUploaded}
-                />
-              </div>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Ask ${role.name} for advice...`}
-                className="block min-h-[48px] max-h-[120px] flex-1 resize-none border-0 bg-transparent py-3 pl-1 pr-40 text-left text-base leading-normal placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
+                className="block min-h-[48px] max-h-[120px] flex-1 resize-none border-0 bg-transparent py-3 px-4 text-left text-base leading-normal placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                 rows={1}
               />
               <div className="absolute right-2 bottom-2 flex items-center gap-2">
-                <ModelPicker 
-                  selectedModelId={modelOverride} 
-                  onModelSelect={setModelOverride} 
-                  defaultModelName="Claude Sonnet 4"
-                />
                 <Button
                   type="button"
                   size="icon"
