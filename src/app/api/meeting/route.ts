@@ -273,11 +273,19 @@ This will be shown to the user as a suggestion, not an automatic trigger.`,
 
         } catch (error) {
           console.error(`Error generating response for ${mention.roleSlug}:`, error);
+          // Send a visible error message so the user knows what happened
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-            type: 'error',
+            type: 'token',
             roleSlug: mention.roleSlug,
-            error: 'Failed to generate response',
+            roleName: roleConfig?.name || mention.roleName,
+            content: `[I'm having trouble responding right now. The model may be temporarily unavailable. Try again or switch my model in Settings.]`,
           })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'role_complete',
+            roleSlug: mention.roleSlug,
+          })}\n\n`));
+          // Continue to next role — don't break the loop
+          continue;
         }
       }
 
