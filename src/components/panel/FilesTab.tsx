@@ -23,29 +23,32 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Simulated fetch
+  // Fetch real files from API
   useEffect(() => {
     let mounted = true;
     const loadFiles = async () => {
       setLoading(true);
-      // Try to fetch, or fallback to mock
       try {
-        const res = await fetch(`/api/files?workspaceId=${workspaceId}${chatId ? `&chatId=${chatId}` : ''}${projectId ? `&projectId=${projectId}` : ''}`);
+        const params = new URLSearchParams({ workspaceId });
+        if (chatId) params.append('chatId', chatId);
+        if (projectId) params.append('projectId', projectId);
+        const res = await fetch(`/api/files?${params}`);
         if (res.ok) {
           const data = await res.json();
-          if (mounted) setFiles(data);
+          const mapped = (Array.isArray(data) ? data : []).map((f: Record<string, unknown>) => ({
+            id: f.id as string,
+            name: f.name as string,
+            sizeBytes: (f.size_bytes || f.file_size || 0) as number,
+            status: f.extraction_status === 'done' ? 'done' as const : f.extraction_status === 'failed' ? 'failed' as const : 'processing' as const,
+            type: (f.file_type || 'application/octet-stream') as string,
+            scope: (f.chat_id === chatId && chatId ? 'chat' : f.project_id === projectId && projectId ? 'project' : 'workspace') as 'chat' | 'project' | 'workspace',
+          }));
+          if (mounted) setFiles(mapped);
         } else {
-          throw new Error('Fallback to mock');
+          if (mounted) setFiles([]);
         }
       } catch {
-        if (!mounted) return;
-        // Mock data
-        setFiles([
-          { id: '1', name: 'market_research.pdf', sizeBytes: 1200000, status: 'done', type: 'application/pdf', scope: 'chat' },
-          { id: '2', name: 'financials_q3.xlsx', sizeBytes: 450000, status: 'processing', type: 'application/vnd.ms-excel', scope: 'project' },
-          { id: '3', name: 'user_interviews.docx', sizeBytes: 2100000, status: 'failed', type: 'application/msword', scope: 'project' },
-          { id: '4', name: 'company_branding.png', sizeBytes: 5000000, status: 'done', type: 'image/png', scope: 'workspace' },
-        ]);
+        if (mounted) setFiles([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -54,35 +57,101 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
     return () => { mounted = false; };
   }, [workspaceId, chatId, projectId]);
 
+  // Poll for processing files every 5 seconds
+  useEffect(() => {
+    const processingFiles = files.filter(f => f.status === 'processing');
+    if (processingFiles.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const params = new URLSearchParams({ workspaceId });
+        if (chatId) params.append('chatId', chatId);
+        if (projectId) params.append('projectId', projectId);
+        const res = await fetch(`/api/files?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (Array.isArray(data) ? data : []).map((f: Record<string, unknown>) => ({
+            id: f.id as string,
+            name: f.name as string,
+            sizeBytes: (f.size_bytes || f.file_size || 0) as number,
+            status: f.extraction_status === 'done' ? 'done' as const : f.extraction_status === 'failed' ? 'failed' as const : 'processing' as const,
+            type: (f.file_type || 'application/octet-stream') as string,
+            scope: (f.chat_id === chatId && chatId ? 'chat' : f.project_id === projectId && projectId ? 'project' : 'workspace') as 'chat' | 'project' | 'workspace',
+          }));
+          setFiles(mapped);
+        }
+      } catch { /* ignore polling errors */ }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [files, workspaceId, chatId, projectId]);
+
   const handleUpload = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
+    input.accept = ".pdf,.docx,.doc,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg";
+
     input.onchange = async (e) => {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
       if (!selected.length) return;
 
-      const newFiles = selected.map(f => ({
-        id: Math.random().toString(),
-        name: f.name,
-        sizeBytes: f.size,
-        status: 'processing' as const,
-        type: f.type,
-        scope: (chatId ? 'chat' : projectId ? 'project' : 'workspace') as 'chat' | 'project' | 'workspace'
-      }));
+      for (const file of selected) {
+        const tempId = `temp-${Date.now()}-${Math.random()}`;
+        const scope: 'chat' | 'project' | 'workspace' = chatId ? 'chat' : projectId ? 'project' : 'workspace';
 
-      setFiles(prev => [...newFiles, ...prev]);
+        // Show processing immediately
+        setFiles(prev => [{ id: tempId, name: file.name, sizeBytes: file.size, status: 'processing', type: file.type, scope }, ...prev]);
 
-      // Simulate extraction completing
-      setTimeout(() => {
-        setFiles(prev => prev.map(f => 
-          newFiles.find(n => n.id === f.id) 
-            ? { ...f, status: Math.random() > 0.8 ? 'failed' : 'done' } 
-            : f
-        ));
-      }, 3000);
+        try {
+          // Try signed URL upload (supports large files)
+          const urlRes = await fetch('/api/files/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, fileType: file.type, workspaceId, chatId: chatId || null, projectId: projectId || null }),
+          });
+
+          if (urlRes.ok) {
+            const { fileId, uploadUrl } = await urlRes.json();
+            await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+            // Trigger extraction
+            fetch(`/api/files/${fileId}/extract`, { method: 'POST' }).catch(() => {});
+            // Replace temp entry with real ID
+            setFiles(prev => prev.map(f => f.id === tempId ? { ...f, id: fileId } : f));
+          } else {
+            // Fallback to multipart upload for small files
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('workspaceId', workspaceId);
+            if (chatId) formData.append('chatId', chatId);
+            if (projectId) formData.append('projectId', projectId);
+            const uploadRes = await fetch('/api/files/upload', { method: 'POST', body: formData });
+            const uploadData = await uploadRes.json();
+            const first = Array.isArray(uploadData) ? uploadData[0] : uploadData;
+            if (first?.id) {
+              setFiles(prev => prev.map(f => f.id === tempId ? { ...f, id: first.id } : f));
+            }
+          }
+        } catch (err) {
+          console.error('Upload failed:', err);
+          setFiles(prev => prev.map(f => f.id === tempId ? { ...f, status: 'failed' } : f));
+        }
+      }
     };
+
     input.click();
+  };
+
+  const handleRetry = (fileId: string) => {
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'processing' } : f));
+    fetch(`/api/files/${fileId}/extract`, { method: 'POST' }).catch(console.error);
+  };
+
+  const handleDelete = async (fileId: string) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+    try {
+      await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+    } catch { /* ignore */ }
   };
 
   const getFileIcon = (type: string) => {
@@ -107,7 +176,7 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
         {getFileIcon(f.type)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate cursor-pointer hover:underline">
+        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
           {f.name}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
@@ -131,15 +200,13 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
         </div>
       </div>
       {f.status === 'failed' && (
-        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => console.log('Retry', f.id)}>
+        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRetry(f.id)}>
           <RefreshCw className="h-3 w-3 text-zinc-400" />
         </Button>
       )}
-      {f.status !== 'failed' && (
-        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500" onClick={() => setFiles(prev => prev.filter(x => x.id !== f.id))}>
-          <X className="h-3 w-3" />
-        </Button>
-      )}
+      <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500" onClick={() => handleDelete(f.id)}>
+        <X className="h-3 w-3" />
+      </Button>
     </div>
   );
 
@@ -168,7 +235,7 @@ export function FilesTab({ workspaceId, chatId, projectId }: FilesTabProps) {
                 <div className="space-y-1">{chatFiles.map(renderFile)}</div>
               </div>
             )}
-            
+
             {projectFiles.length > 0 && (
               <div>
                 <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-1">Project</h4>
