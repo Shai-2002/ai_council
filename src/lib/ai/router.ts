@@ -20,21 +20,23 @@ export function resolveModel(options: {
 /** Get display name for a model slug (for UI attribution) */
 export function getModelDisplayName(slug: string): string {
   const names: Record<string, string> = {
-    'anthropic/claude-sonnet-4.6': 'Claude Sonnet 4',
-    'anthropic/claude-opus-4.6': 'Claude Opus 4',
-    'anthropic/claude-haiku-4.5': 'Claude Haiku 4',
+    'anthropic/claude-sonnet-4.6': 'Claude Sonnet 4.6',
+    'anthropic/claude-opus-4.6': 'Claude Opus 4.6',
+    'openai/gpt-5.4': 'GPT-5.4',
+    'openai/gpt-5.2': 'GPT-5.2',
+    'x-ai/grok-4.1-fast': 'Grok 4.1 Fast',
     'x-ai/grok-3': 'Grok 3',
-    'x-ai/grok-3-mini': 'Grok 3 Mini',
-    'openai/gpt-4o': 'GPT-4o',
-    'openai/gpt-4o-mini': 'GPT-4o Mini',
-    'openai/o3-mini': 'o3 Mini',
+    'google/gemini-3-flash-preview': 'Gemini 3 Flash',
     'google/gemini-2.5-flash': 'Gemini 2.5 Flash',
-    'google/gemini-2.5-pro': 'Gemini 2.5 Pro',
-    'qwen/qwen3-32b': 'Qwen 3 32B',
+    'deepseek/deepseek-v3.2': 'DeepSeek V3.2',
+    'deepseek/deepseek-chat-v3-0324': 'DeepSeek Chat V3',
+    'qwen/qwen3-235b-a22b-2507': 'Qwen 3 235B',
+    'qwen/qwen3.5-flash-02-23': 'Qwen 3.5 Flash',
+    'perplexity/sonar-deep-research': 'Perplexity Deep Research',
+    'perplexity/sonar-pro-search': 'Perplexity Pro Search',
+    'perplexity/sonar-reasoning-pro': 'Perplexity Reasoning Pro',
     'perplexity/sonar': 'Perplexity Sonar',
-    'meta-llama/llama-4-maverick': 'Llama 4 Maverick',
-    'deepseek/deepseek-r1': 'DeepSeek R1',
-    'mistralai/mistral-large-2411': 'Mistral Large',
+    'xiaomi/mimo-v2-pro': 'MiMo V2 Pro',
   };
   return names[slug] || slug.split('/').pop() || slug;
 }
